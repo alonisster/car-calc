@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Car, LogOut, User } from "lucide-react";
+import { LogOut, User, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -25,44 +25,49 @@ export default function Navbar() {
   };
 
   return (
-    <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="bg-blue-500 rounded-lg p-1.5">
-            <Car className="text-white" size={18} />
+    <header className="sticky top-0 z-50 border-b border-white/[0.06]"
+      style={{ background: "rgba(7,11,20,0.85)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
+      <div className="max-w-7xl mx-auto px-5 h-14 flex items-center justify-between">
+
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-500 rounded-lg blur-sm opacity-50 group-hover:opacity-75 transition-opacity" />
+            <div className="relative bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg p-1.5">
+              <BarChart3 className="text-white" size={16} />
+            </div>
           </div>
-          <span className="text-white font-bold tracking-tight">
-            Car-Calc <span className="text-blue-400">IL</span>
+          <span className="font-bold tracking-tight text-white">
+            Car‑Calc<span className="text-blue-400 ml-0.5">IL</span>
           </span>
         </Link>
 
-        <nav className="flex items-center gap-4">
+        {/* Nav */}
+        <nav className="flex items-center gap-3">
           {user ? (
             <>
-              <span className="text-slate-400 text-sm flex items-center gap-1.5">
-                <User size={14} />
+              <div className="hidden sm:flex items-center gap-2 text-slate-400 text-sm bg-white/5 border border-white/[0.07] rounded-full px-3 py-1.5">
+                <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-bold text-white">
+                  {(user.user_metadata?.first_name?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                </div>
                 {user.user_metadata?.first_name ?? user.email}
-              </span>
+              </div>
               <button
                 onClick={handleLogout}
-                className="text-slate-400 hover:text-white text-sm flex items-center gap-1.5 transition-colors"
+                className="text-slate-500 hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-red-500/10"
+                title="Sign out"
               >
-                <LogOut size={14} />
-                Sign out
+                <LogOut size={15} />
               </button>
             </>
           ) : (
             <>
-              <Link
-                href="/auth/login"
-                className="text-slate-300 hover:text-white text-sm transition-colors"
-              >
+              <Link href="/auth/login"
+                className="text-slate-400 hover:text-white text-sm transition-colors hidden sm:block">
                 Sign in
               </Link>
-              <Link
-                href="/auth/signup"
-                className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg px-3 py-1.5 transition-colors"
-              >
+              <Link href="/auth/signup"
+                className="btn-primary !py-1.5 !px-3.5 !text-xs !rounded-lg">
                 Sign up free
               </Link>
             </>
