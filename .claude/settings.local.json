@@ -5,7 +5,9 @@
       "Bash(npm install:*)",
       "Bash(curl -s \"https://data.gov.il/api/3/action/package_show?id=7a338622-63bb-4cfd-b3f7-0d2e8cf71033\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(r[''''id''''], r.get\\(''''name'''',''''''''\\), r.get\\(''''format'''',''''''''\\)\\) for r in d[''''result''''][''''resources'''']]\")",
-      "WebFetch(domain:en.wikipedia.org)"
+      "WebFetch(domain:en.wikipedia.org)",
+      "Bash(curl -s \"http://localhost:3000/api/fuel-price\")",
+      "Bash(curl -s \"http://localhost:3001/api/fuel-price\")"
     ]
   }
 }

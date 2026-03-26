@@ -284,9 +284,6 @@ export default function HomePage() {
           ))}
         </div>
 
-        <p className="mt-10 text-slate-700 text-xs text-center max-w-md animate-in delay-300">
-          Estimates based on Israeli market data. Fuel ₪7.50/L. Actual costs vary.
-        </p>
       </main>
     </div>
   );

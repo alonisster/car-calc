@@ -23,6 +23,10 @@ export interface TCOResult {
   annualMaintenanceCostILS: number;
   monthlyMaintenanceCostILS: number;
 
+  // Insurance (ביטוח מקיף)
+  annualInsuranceCostILS: number;
+  monthlyInsuranceCostILS: number;
+
   // Depreciation
   depreciationRatePercent: number; // % per year
   annualDepreciationILS: number;
@@ -652,7 +656,9 @@ function estimateAnnualMaintenance(
   const ageFactor = ageMaintenanceMultiplier(carYear);
   const reliabilityFactor = reliabilityMaintenanceMultiplier(reliabilityScore);
 
-  return Math.round(baseRoutineCost * ageFactor * reliabilityFactor);
+  // 1.5x multiplier: base routine covers oil/filters; real-world also includes
+  // tire replacement, annual roadworthiness test (טסט), unplanned repairs, wipers, brakes, etc.
+  return Math.round(baseRoutineCost * ageFactor * reliabilityFactor * 1.5);
 }
 
 // ─── Reliability scores (1–10) ───────────────────────────────────────────────
@@ -742,6 +748,21 @@ export interface TCOOverrides {
   depreciationRatePercent?: number;
   /** Override real-world fuel efficiency (km/L) */
   realWorldKmL?: number;
+  /** Override fuel price per liter (ILS) */
+  fuelPricePerLiter?: number;
+  /** Override annual comprehensive insurance cost (ILS) */
+  insuranceILS?: number;
+}
+
+/** Estimate annual insurance (ביטוח מקיף + ביטוח חובה) based on car value and age */
+export function estimateInsurance(purchasePrice: number, year: number): number {
+  const age = new Date().getFullYear() - year;
+  // Comprehensive (מקיף) rate as % of purchase price, decreasing with age
+  const rate = age <= 2 ? 0.028 : age <= 5 ? 0.024 : age <= 10 ? 0.020 : 0.016;
+  const comprehensive = purchasePrice * rate;
+  // 1.5x for חובה inclusion, ×1.35 calibration to match real IL market prices
+  const raw = comprehensive * 1.5 * 1.35;
+  return Math.round(Math.max(3_000, Math.min(18_000, raw)));
 }
 
 // ─── Main TCO calculator ──────────────────────────────────────────────────────
@@ -763,11 +784,13 @@ export function calculateTCO(input: CarInput, overrides?: TCOOverrides): TCOResu
     ? 100 / overrides.realWorldKmL
     : computedRealWorldL100;
 
+  const effectiveFuelPrice = overrides?.fuelPricePerLiter ?? FUEL_PRICE_PER_LITER;
+
   let annualFuelCostILS: number;
   if (isEV || officialFuelConsumption === 0) {
     annualFuelCostILS = (18 * rwCorrection / 100) * annualMileageKm * 0.60;
   } else {
-    annualFuelCostILS = (realWorldFuelConsumption / 100) * annualMileageKm * FUEL_PRICE_PER_LITER;
+    annualFuelCostILS = (realWorldFuelConsumption / 100) * annualMileageKm * effectiveFuelPrice;
   }
   const monthlyFuelCostILS = annualFuelCostILS / 12;
 
@@ -789,8 +812,13 @@ export function calculateTCO(input: CarInput, overrides?: TCOOverrides): TCOResu
   const annualDepreciationILS = totalDepreciation / holdingPeriodYears;
   const monthlyDepreciationILS = annualDepreciationILS / 12;
 
+  // ── Insurance ─────────────────────────────────────────────────────────────
+  const annualInsuranceCostILS = overrides?.insuranceILS
+    ?? estimateInsurance(purchasePrice, year);
+  const monthlyInsuranceCostILS = annualInsuranceCostILS / 12;
+
   // ── Totals ────────────────────────────────────────────────────────────────
-  const annualTCO = annualDepreciationILS + annualFuelCostILS + annualMaintenanceCostILS;
+  const annualTCO = annualDepreciationILS + annualFuelCostILS + annualMaintenanceCostILS + annualInsuranceCostILS;
   const monthlyTCO = annualTCO / 12;
   const totalHoldingCostILS = annualTCO * holdingPeriodYears;
 
@@ -811,6 +839,8 @@ export function calculateTCO(input: CarInput, overrides?: TCOOverrides): TCOResu
     dataSource,
     annualMaintenanceCostILS: Math.round(annualMaintenanceCostILS),
     monthlyMaintenanceCostILS: Math.round(monthlyMaintenanceCostILS),
+    annualInsuranceCostILS: Math.round(annualInsuranceCostILS),
+    monthlyInsuranceCostILS: Math.round(monthlyInsuranceCostILS),
     depreciationRatePercent: Math.round(depRate * 100),
     annualDepreciationILS: Math.round(annualDepreciationILS),
     monthlyDepreciationILS: Math.round(monthlyDepreciationILS),

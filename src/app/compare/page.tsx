@@ -5,11 +5,11 @@ import { useSearchParams } from "next/navigation";
 import {
   Plus, X, Fuel, Wrench, TrendingDown, RefreshCw,
   Loader2, Search, AlertCircle, ChevronDown, ChevronUp,
-  Pencil, Check, RotateCcw, Car,
+  Pencil, Check, RotateCcw, Car, ShieldCheck,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import SearchSelect, { type SelectOption } from "@/components/SearchSelect";
-import { calculateTCO, formatILS, type CarInput, type TCOResult, type TCOOverrides } from "@/lib/tco";
+import { calculateTCO, estimateInsurance, formatILS, type CarInput, type TCOResult, type TCOOverrides } from "@/lib/tco";
 import { MAKES, MODELS_BY_MAKE, resolveDisplayMake } from "@/lib/carCatalog";
 
 // ── Option lists ──────────────────────────────────────────────────────────────
@@ -25,6 +25,8 @@ interface Estimates {
   maintenanceILS: number;
   depreciationRatePercent: number;
   realWorldKmL: number;
+  fuelPricePerLiter: number;
+  insuranceILS: number;
 }
 interface CarEntry {
   id: string;
@@ -84,11 +86,12 @@ function ScoreBar({ score, label }: { score: number; label: string }) {
 
 // ── CostBar — proportional waterfall breakdown ────────────────────────────────
 function CostBreakdown({ tco }: { tco: TCOResult }) {
-  const total = tco.annualDepreciationILS + tco.annualFuelCostILS + tco.annualMaintenanceCostILS;
+  const total = tco.annualDepreciationILS + tco.annualFuelCostILS + tco.annualMaintenanceCostILS + tco.annualInsuranceCostILS;
   const items = [
-    { label: "Depreciation", value: tco.annualDepreciationILS, color: "#f97316", icon: TrendingDown },
+    { label: "Depreciation", value: tco.annualDepreciationILS,    color: "#f97316", icon: TrendingDown },
     { label: "Fuel",         value: tco.annualFuelCostILS,        color: "#eab308", icon: Fuel },
     { label: "Maintenance",  value: tco.annualMaintenanceCostILS, color: "#3b82f6", icon: Wrench },
+    { label: "Insurance",    value: tco.annualInsuranceCostILS,   color: "#a78bfa", icon: ShieldCheck },
   ];
   return (
     <div className="space-y-2">
@@ -215,10 +218,11 @@ function Field({ label, required: req, children }: { label: string; required?: b
 }
 
 // ── CarCard ───────────────────────────────────────────────────────────────────
-function CarCard({ car, index, onUpdate, onRemove, canRemove }: {
+function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
   car: CarEntry; index: number;
   onUpdate: (id: string, updates: Partial<CarEntry>) => void;
   onRemove: (id: string) => void; canRemove: boolean;
+  fuelPrices: { petrol: number; diesel: number };
 }) {
   const [showInputs, setShowInputs] = useState(true);
   const [plateInput, setPlateInput] = useState(car.plate);
@@ -242,14 +246,28 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove }: {
 
   const handleEstimate = () => {
     if (!isReady(car)) return;
-    const base = calculateTCO(toInput(car));
-    onUpdate(car.id, { estimates: { maintenanceILS: base.annualMaintenanceCostILS, depreciationRatePercent: base.depreciationRatePercent, realWorldKmL: base.realWorldKmPerLiter }, overrides: {}, tco: null });
+    const isDiesel = car.fuelType.toLowerCase().includes("סולר") || car.fuelType.toLowerCase().includes("diesel");
+    const liveFuelPrice = isDiesel ? fuelPrices.diesel : fuelPrices.petrol;
+    const base = calculateTCO(toInput(car), { fuelPricePerLiter: liveFuelPrice });
+    onUpdate(car.id, {
+      estimates: {
+        maintenanceILS: base.annualMaintenanceCostILS,
+        depreciationRatePercent: base.depreciationRatePercent,
+        realWorldKmL: base.realWorldKmPerLiter,
+        fuelPricePerLiter: liveFuelPrice,
+        insuranceILS: estimateInsurance(car.purchasePrice, car.year),
+      },
+      overrides: {}, tco: null,
+    });
     setShowInputs(false);
   };
 
   const handleApply = () => {
     if (!isReady(car) || !car.estimates) return;
-    const ov: TCOOverrides = {};
+    const ov: TCOOverrides = {
+      fuelPricePerLiter: car.overrides.fuelPricePerLiter ?? car.estimates.fuelPricePerLiter,
+      insuranceILS: car.overrides.insuranceILS ?? car.estimates.insuranceILS,
+    };
     if (car.overrides.maintenanceILS != null) ov.maintenanceILS = car.overrides.maintenanceILS;
     if (car.overrides.depreciationRatePercent != null) ov.depreciationRatePercent = car.overrides.depreciationRatePercent;
     if (car.overrides.realWorldKmL != null) ov.realWorldKmL = car.overrides.realWorldKmL;
@@ -427,6 +445,16 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove }: {
             manualValue={car.overrides.realWorldKmL != null ? String(car.overrides.realWorldKmL) : null}
             onSave={(v) => setOverride("realWorldKmL", v)} onReset={() => clearOverride("realWorldKmL")} />
 
+          <EstimateRow icon={Fuel} iconColor="#f59e0b" label="Fuel price (₪/L)"
+            estimatedDisplay={`₪${car.estimates.fuelPricePerLiter.toFixed(2)}/L`} unit="₪/L"
+            manualValue={car.overrides.fuelPricePerLiter != null ? String(car.overrides.fuelPricePerLiter) : null}
+            onSave={(v) => setOverride("fuelPricePerLiter", v)} onReset={() => clearOverride("fuelPricePerLiter")} />
+
+          <EstimateRow icon={ShieldCheck} iconColor="#a78bfa" label="Insurance (מקיף + חובה) / yr"
+            estimatedDisplay={formatILS(car.estimates.insuranceILS)} unit="₪/yr"
+            manualValue={car.overrides.insuranceILS != null ? String(car.overrides.insuranceILS) : null}
+            onSave={(v) => setOverride("insuranceILS", v)} onReset={() => clearOverride("insuranceILS")} />
+
           <button onClick={handleApply} className="btn-success w-full py-3 mt-1">
             <Check size={14} /> {car.tco ? "Recalculate TCO" : "Apply & Calculate TCO"}
           </button>
@@ -521,6 +549,7 @@ function ComparePageInner() {
     fuelType: searchParams.get("fuelType") ?? "בנזין",
   });
   const [cars, setCars] = useState<CarEntry[]>([initialCar]);
+  const fuelPrices = { petrol: 7.5, diesel: 7.2 };
 
   const updateCar = (id: string, updates: Partial<CarEntry>) =>
     setCars((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
@@ -551,6 +580,10 @@ function ComparePageInner() {
           <div>
             <p className="text-slate-600 text-xs uppercase tracking-widest font-semibold mb-1">Total Cost of Ownership</p>
             <h1 className="text-white text-2xl font-extrabold tracking-tight">Compare Vehicles</h1>
+            <p className="text-slate-600 text-xs mt-1.5">
+              Fuel default: <span className="text-amber-400 font-medium">₪{fuelPrices.petrol.toFixed(2)}/L</span>
+              <span className="ml-1">(editable per car below)</span>
+            </p>
           </div>
           {cars.length < 3 && (
             <button onClick={addCar}
@@ -566,7 +599,7 @@ function ComparePageInner() {
         {/* Cards grid */}
         <div className={`grid gap-5 ${cars.length === 1 ? "grid-cols-1 max-w-sm" : cars.length === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}>
           {cars.map((car, i) => (
-            <CarCard key={car.id} car={car} index={i} onUpdate={updateCar} onRemove={removeCar} canRemove={cars.length > 1} />
+            <CarCard key={car.id} car={car} index={i} onUpdate={updateCar} onRemove={removeCar} canRemove={cars.length > 1} fuelPrices={fuelPrices} />
           ))}
         </div>
 
@@ -598,6 +631,7 @@ function ComparePageInner() {
                       { label: "Depreciation / yr",   key: "depreciationRatePercent",  fmt: (v: number) => `${v}%`,                   bestIsMin: true  },
                       { label: "Fuel / yr",            key: "annualFuelCostILS",        fmt: formatILS,                                bestIsMin: true  },
                       { label: "Maintenance / yr",     key: "annualMaintenanceCostILS", fmt: formatILS,                                bestIsMin: true  },
+                      { label: "Insurance / yr",       key: "annualInsuranceCostILS",   fmt: formatILS,                                bestIsMin: true  },
                       { label: "Official fuel",        key: "officialKmPerLiter",       fmt: (v: number) => v > 0 ? `${v} km/L` : "EV", bestIsMin: false },
                       { label: "Real-world fuel eff.", key: "realWorldKmPerLiter",      fmt: (v: number) => v > 0 ? `${v} km/L` : "EV", bestIsMin: false },
                       { label: "Residual value",       key: "residualValueILS",         fmt: formatILS,                                bestIsMin: false },
@@ -624,6 +658,9 @@ function ComparePageInner() {
             </div>
           </div>
         )}
+        <p className="mt-8 text-slate-700 text-xs text-center">
+          Estimates based on Israeli market data. Default fuel ₪7.50/L — override per car if needed. Actual costs vary.
+        </p>
       </main>
     </div>
   );
