@@ -3,51 +3,54 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Search,
-  ArrowRight,
-  Fuel,
-  Wrench,
-  TrendingDown,
-  BarChart3,
-  Loader2,
-  AlertCircle,
+  ArrowRight, Fuel, Wrench, TrendingDown, BarChart3,
+  Loader2, AlertCircle, Zap, ShieldCheck, Search, SlidersHorizontal,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { resolveDisplayMake } from "@/lib/carCatalog";
+import Link from "next/link";
 
 const FEATURES = [
   {
     icon: Fuel,
+    color: "from-amber-500/20 to-amber-600/5",
+    iconColor: "text-amber-400",
     title: "Real-World Fuel Cost",
-    desc: "Manufacturer figures corrected for Israeli road conditions, traffic, and AC usage.",
+    desc: "WLTP figures corrected +30% for Israeli traffic, summer heat, and AC usage.",
   },
   {
     icon: TrendingDown,
+    color: "from-orange-500/20 to-orange-600/5",
+    iconColor: "text-orange-400",
     title: "Israeli Depreciation",
-    desc: "Annual value drop based on local market trends — 10–15% per year.",
+    desc: "Annual value drop based on yad2.co.il market trends — 10–16% per year by brand.",
   },
   {
     icon: Wrench,
-    title: "Maintenance Estimates",
-    desc: "Small and big service costs tailored to each brand in the Israeli market.",
+    color: "from-blue-500/20 to-blue-600/5",
+    iconColor: "text-blue-400",
+    title: "Smart Maintenance",
+    desc: "Age × reliability score formula. A 12-yr Fiat costs 2.4× more than a 12-yr Toyota.",
   },
   {
     icon: BarChart3,
-    title: "Side-by-Side Comparison",
-    desc: "Compare up to 3 vehicles with monthly and annual TCO breakdown.",
+    color: "from-violet-500/20 to-violet-600/5",
+    iconColor: "text-violet-400",
+    title: "Side-by-Side TCO",
+    desc: "Compare up to 3 vehicles with overridable assumptions and full cost breakdown.",
   },
 ];
 
 interface PlateResult {
-  make: string;
-  model: string;
-  year: number;
-  trim: string;
-  engineSize: number | null;
-  fuelType: string;
+  make: string; model: string; year: number;
+  trim: string; engineSize: number | null; fuelType: string;
 }
+
+type Tab = "plate" | "manual";
 
 export default function HomePage() {
   const router = useRouter();
+  const [tab, setTab] = useState<Tab>("plate");
   const [plate, setPlate] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PlateResult | null>(null);
@@ -56,176 +59,231 @@ export default function HomePage() {
   const lookup = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!plate.trim()) return;
-
-    setLoading(true);
-    setError("");
-    setResult(null);
-
+    setLoading(true); setError(""); setResult(null);
     try {
-      const res = await fetch(
-        `/api/car?plate=${encodeURIComponent(plate.trim())}`
-      );
+      const res = await fetch(`/api/car?plate=${encodeURIComponent(plate.trim())}`);
       const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error ?? "Vehicle not found.");
-        return;
-      }
-
+      if (!res.ok) { setError(data.error ?? "Vehicle not found."); return; }
       setResult(data);
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Network error. Please try again."); }
+    finally { setLoading(false); }
   };
 
   const goToCompare = () => {
     if (!result) return;
     const params = new URLSearchParams({
-      plate,
-      make: result.make,
-      model: result.model,
-      year: String(result.year),
-      trim: result.trim,
-      engineSize: String(result.engineSize ?? ""),
-      fuelType: result.fuelType,
+      plate, make: result.make, model: result.model,
+      year: String(result.year), trim: result.trim,
+      engineSize: String(result.engineSize ?? ""), fuelType: result.fuelType,
     });
     router.push(`/compare?${params}`);
   };
 
+  const englishMake = result ? resolveDisplayMake(result.make) : "";
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: "#070b14" }}>
+      {/* Background orbs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden>
+        <div className="orb-1 absolute -top-[200px] -right-[150px] w-[700px] h-[700px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 70%)", filter: "blur(40px)" }} />
+        <div className="orb-2 absolute -bottom-[200px] -left-[150px] w-[600px] h-[600px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(124,58,237,0.14) 0%, transparent 70%)", filter: "blur(40px)" }} />
+        <div className="orb-3 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(6,182,212,0.08) 0%, transparent 70%)", filter: "blur(60px)" }} />
+      </div>
+
       <Navbar />
 
-      {/* Hero */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-20">
-        <div className="max-w-3xl w-full text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium rounded-full px-3 py-1 mb-6">
-            <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+      <main className="relative flex-1 flex flex-col items-center px-4 pt-16 pb-24">
+
+        {/* ── Hero ──────────────────────────────────────────────────────── */}
+        <div className="max-w-2xl w-full text-center animate-in">
+          {/* Live badge */}
+          <div className="inline-flex items-center gap-2.5 rounded-full px-4 py-1.5 mb-7 text-xs font-medium"
+            style={{ background: "rgba(37,99,235,0.1)", border: "1px solid rgba(59,130,246,0.25)", color: "#93c5fd" }}>
+            <span className="relative flex h-2 w-2">
+              <span className="ping-slow absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+            </span>
             Israeli Vehicle Registry — Live Data
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-bold text-white leading-tight mb-4">
+          <h1 className="text-5xl md:text-[4rem] lg:text-[4.5rem] font-extrabold tracking-tight leading-[1.08] text-white mb-4">
             Know the{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
+            <span style={{ background: "linear-gradient(135deg,#60a5fa,#34d399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               real cost
-            </span>{" "}
-            of your car
+            </span>
+            <br />of any car
           </h1>
-          <p className="text-slate-400 text-lg md:text-xl mb-10 max-w-xl mx-auto">
-            Enter any Israeli license plate. Get instant fuel, maintenance, and
-            depreciation analysis — then compare up to 3 cars side-by-side.
+          <p className="text-slate-400 text-lg max-w-lg mx-auto mb-10 leading-relaxed">
+            Fuel, maintenance, and depreciation — tailored to the Israeli market.
+            Start with a license plate or pick your car manually.
           </p>
 
-          {/* Search bar */}
-          <form
-            onSubmit={lookup}
-            className="flex flex-col sm:flex-row items-stretch gap-3 max-w-lg mx-auto"
-          >
-            <div className="relative flex-1">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={18}
-              />
-              <input
-                type="text"
-                value={plate}
-                onChange={(e) => setPlate(e.target.value)}
-                placeholder="e.g. 123-45-678"
-                className="w-full bg-white/5 border border-white/10 text-white placeholder-slate-500 rounded-xl pl-10 pr-4 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono tracking-widest"
-                maxLength={12}
-              />
+          {/* ── Input card ──────────────────────────────────────────────── */}
+          <div className="max-w-lg mx-auto card-glow">
+            {/* Tabs */}
+            <div className="flex border-b" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+              <button
+                onClick={() => { setTab("plate"); setResult(null); setError(""); }}
+                className="flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors"
+                style={{
+                  color: tab === "plate" ? "#60a5fa" : "#64748b",
+                  borderBottom: tab === "plate" ? "2px solid #3b82f6" : "2px solid transparent",
+                  marginBottom: "-1px",
+                }}
+              >
+                <Search size={14} />
+                Search by Plate
+              </button>
+              <button
+                onClick={() => { setTab("manual"); setResult(null); setError(""); }}
+                className="flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors"
+                style={{
+                  color: tab === "manual" ? "#60a5fa" : "#64748b",
+                  borderBottom: tab === "manual" ? "2px solid #3b82f6" : "2px solid transparent",
+                  marginBottom: "-1px",
+                }}
+              >
+                <SlidersHorizontal size={14} />
+                Choose Manually
+              </button>
             </div>
-            <button
-              type="submit"
-              disabled={loading || !plate.trim()}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl px-6 py-3.5 text-base transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-            >
-              {loading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <>
-                  Search <ArrowRight size={16} />
-                </>
-              )}
-            </button>
-          </form>
 
-          {/* Error */}
-          {error && (
-            <div className="mt-4 flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 max-w-lg mx-auto">
-              <AlertCircle size={16} className="shrink-0" />
-              {error}
-            </div>
-          )}
-
-          {/* Result card */}
-          {result && (
-            <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-5 max-w-lg mx-auto text-left">
-              <div className="flex items-start justify-between gap-4">
+            <div className="p-6">
+              {tab === "plate" ? (
                 <div>
-                  <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">
-                    Vehicle Found
-                  </div>
-                  <h2 className="text-white text-xl font-bold">
-                    {result.year} {result.make} {result.model}
-                  </h2>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {result.trim && (
-                      <span className="bg-blue-500/10 text-blue-400 text-xs rounded-full px-2.5 py-0.5 border border-blue-500/20">
-                        {result.trim}
-                      </span>
-                    )}
-                    {result.engineSize && (
-                      <span className="bg-slate-700 text-slate-300 text-xs rounded-full px-2.5 py-0.5">
-                        {result.engineSize}L
-                      </span>
-                    )}
-                    {result.fuelType && (
-                      <span className="bg-slate-700 text-slate-300 text-xs rounded-full px-2.5 py-0.5">
-                        {result.fuelType}
-                      </span>
-                    )}
-                  </div>
+                  <p className="text-slate-500 text-sm mb-4">
+                    Enter your Israeli plate number — we'll auto-fill make, model, and year.
+                  </p>
+                  <form onSubmit={lookup} className="space-y-3">
+                    {/* Plate-styled input */}
+                    <div className="relative rounded-xl overflow-hidden shadow-xl"
+                      style={{ border: "2px solid rgba(255,255,255,0.12)" }}>
+                      <div className="flex items-stretch">
+                        <div className="flex flex-col items-center justify-center gap-0.5 px-3.5 shrink-0 self-stretch"
+                          style={{ background: "linear-gradient(180deg,#1e3a8a,#1e40af)", borderRight: "2px solid rgba(255,255,255,0.15)" }}>
+                          <span className="text-white text-[9px] leading-none mb-0.5">✡</span>
+                          <span className="text-white text-[10px] font-black tracking-widest leading-none">IL</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={plate}
+                          onChange={(e) => { setPlate(e.target.value); setResult(null); setError(""); }}
+                          onKeyDown={(e) => e.key === "Enter" && lookup()}
+                          placeholder="123-45-678"
+                          maxLength={12}
+                          className="flex-1 text-center text-2xl font-black tracking-[0.22em] py-3.5 focus:outline-none"
+                          style={{ background: "#f8f6ee", color: "#111", caretColor: "#2563eb" }}
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading || !plate.trim()}
+                      className="btn-primary w-full py-3 text-sm"
+                    >
+                      {loading
+                        ? <><Loader2 size={16} className="animate-spin" /> Looking up…</>
+                        : <><Zap size={15} /> Look Up Vehicle</>
+                      }
+                    </button>
+                  </form>
+
+                  {error && (
+                    <div className="mt-3 flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm animate-in"
+                      style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5" }}>
+                      <AlertCircle size={15} className="shrink-0" />
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Result → big CTA */}
+                  {result && (
+                    <div className="mt-4 animate-in">
+                      <div className="rounded-xl p-4 mb-3"
+                        style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <ShieldCheck size={14} className="text-emerald-400" />
+                          <span className="text-emerald-400 text-xs font-semibold uppercase tracking-wider">Vehicle Found</span>
+                        </div>
+                        <p className="text-white text-lg font-bold">
+                          {result.year} {englishMake} {result.model}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {result.trim && (
+                            <span className="text-xs rounded-full px-2.5 py-0.5 font-medium"
+                              style={{ background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)", color: "#93c5fd" }}>
+                              {result.trim}
+                            </span>
+                          )}
+                          {result.engineSize && (
+                            <span className="text-xs rounded-full px-2.5 py-0.5"
+                              style={{ background: "rgba(255,255,255,0.07)", color: "#94a3b8" }}>
+                              {result.engineSize}L
+                            </span>
+                          )}
+                          {result.fuelType && (
+                            <span className="text-xs rounded-full px-2.5 py-0.5"
+                              style={{ background: "rgba(255,255,255,0.07)", color: "#94a3b8" }}>
+                              {result.fuelType}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={goToCompare}
+                        className="btn-success w-full py-3.5 text-base font-bold"
+                      >
+                        Start TCO Comparison <ArrowRight size={18} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={goToCompare}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl px-4 py-2.5 text-sm transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
-                >
-                  Compare <ArrowRight size={14} />
-                </button>
-              </div>
+              ) : (
+                <div className="text-center py-2">
+                  <div className="w-14 h-14 rounded-2xl mx-auto mb-5 flex items-center justify-center"
+                    style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
+                    <BarChart3 className="text-blue-400" size={26} />
+                  </div>
+                  <h3 className="text-white font-bold text-lg mb-2">Pick your cars, compare costs</h3>
+                  <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                    Choose make, model, year and purchase price for up to 3 cars.
+                    We'll calculate full TCO with fuel, maintenance, and depreciation.
+                  </p>
+                  <Link href="/compare" className="btn-primary w-full py-3.5 text-base font-bold inline-flex items-center justify-center gap-2">
+                    Open Comparison Tool <ArrowRight size={18} />
+                  </Link>
+                  <p className="text-slate-600 text-xs mt-4">
+                    You can also search by plate on the comparison page to add a second or third car.
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Feature grid */}
-        <div className="mt-24 max-w-4xl w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <div
-              key={title}
-              className="bg-white/5 border border-white/10 rounded-2xl p-5 flex gap-4"
-            >
-              <div className="bg-blue-500/10 rounded-xl p-2.5 shrink-0 h-fit">
-                <Icon className="text-blue-400" size={20} />
+        {/* ── Feature grid ──────────────────────────────────────────────── */}
+        <div className="mt-16 max-w-3xl w-full grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in delay-200">
+          {FEATURES.map(({ icon: Icon, color, iconColor, title, desc }) => (
+            <div key={title} className="group rounded-2xl p-5 flex gap-4 transition-all duration-200 cursor-default"
+              style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)")}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}>
+              <div className={`rounded-xl p-2.5 shrink-0 h-fit bg-gradient-to-br ${color}`}>
+                <Icon className={iconColor} size={20} />
               </div>
               <div>
-                <h3 className="text-white font-semibold text-sm mb-1">
-                  {title}
-                </h3>
-                <p className="text-slate-400 text-sm leading-relaxed">{desc}</p>
+                <h3 className="text-white font-semibold text-sm mb-1">{title}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Disclaimer */}
-        <p className="mt-12 text-slate-600 text-xs text-center max-w-xl">
-          TCO estimates are based on Israeli market data and Smart Estimator
-          logic. Fuel price: &#8362;7.50/L. Actual costs may vary.
-        </p>
       </main>
     </div>
   );
