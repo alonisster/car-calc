@@ -116,10 +116,16 @@ export default function HomePage() {
             </span>
             <br />of any car
           </h1>
-          <p className="text-slate-400 text-lg max-w-lg mx-auto mb-10 leading-relaxed">
-            Fuel, maintenance, and depreciation — tailored to the Israeli market.
-            Start with a license plate or pick your car manually.
+          <p className="text-slate-400 text-lg max-w-xl mx-auto mb-5 leading-relaxed">
+            The sticker price is just the beginning. Compare up to 3 cars side-by-side and see the <strong className="text-slate-300">true annual cost</strong> — fuel, maintenance, depreciation, and insurance — tailored to the Israeli market.
           </p>
+
+          {/* Value proposition callout */}
+          <div className="inline-flex items-center gap-3 rounded-2xl px-5 py-3 mb-10 text-sm"
+            style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.18)" }}>
+            <span className="text-emerald-400 font-semibold">Example:</span>
+            <span className="text-slate-400">A ₪90,000 Mazda 3 can cost <span className="text-white font-semibold">₪12,000/yr less</span> to own than a ₪75,000 Dacia Duster.</span>
+          </div>
 
           {/* ── Input card ──────────────────────────────────────────────── */}
           <div className="max-w-lg mx-auto card-glow">
@@ -266,8 +272,33 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ── How it works ────────────────────────────────────────────── */}
+        <div className="mt-16 max-w-2xl w-full animate-in delay-150">
+          <p className="text-center text-xs font-semibold uppercase tracking-widest mb-6" style={{ color: "#475569" }}>How it works</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { step: "1", title: "Add your cars", desc: "Search by Israeli plate number or pick make, model & year manually. Add up to 3 cars." },
+              { step: "2", title: "Set your assumptions", desc: "Adjust purchase price, annual km, fuel price, and depreciation to match your situation." },
+              { step: "3", title: "Compare real costs", desc: "See annual & monthly TCO side-by-side. Identify which car is actually cheaper to own." },
+            ].map(({ step, title, desc }) => (
+              <div key={step} className="rounded-2xl p-5 text-center"
+                style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-3 text-sm font-bold"
+                  style={{ background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)", color: "#60a5fa" }}>
+                  {step}
+                </div>
+                <h3 className="text-white font-semibold text-sm mb-1.5">{title}</h3>
+                <p className="text-slate-500 text-xs leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* ── Feature grid ──────────────────────────────────────────────── */}
-        <div className="mt-16 max-w-3xl w-full grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in delay-200">
+        <div className="mt-10 max-w-3xl w-full grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in delay-200">
+          <div className="sm:col-span-2 text-center mb-1">
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#475569" }}>What's factored in</p>
+          </div>
           {FEATURES.map(({ icon: Icon, color, iconColor, title, desc }) => (
             <div key={title} className="group rounded-2xl p-5 flex gap-4 transition-all duration-200 cursor-default"
               style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}
