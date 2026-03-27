@@ -46,10 +46,10 @@ export default function Navbar() {
 
         {/* Nav */}
         <nav className="flex items-center gap-3">
-          {/* Guide link */}
-          <Link href="/guide"
+          {/* Compare link */}
+          <Link href="/compare"
             className="text-slate-400 hover:text-white text-sm transition-colors hidden sm:block">
-            {t("guideLink")}
+            {t("openCompareTool")}
           </Link>
 
           {/* Language toggle */}
