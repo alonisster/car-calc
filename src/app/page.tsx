@@ -1,288 +1,257 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  ArrowRight, Fuel, Wrench, TrendingDown, BarChart3,
-  Loader2, AlertCircle, Zap, ShieldCheck, Search, SlidersHorizontal,
-} from "lucide-react";
-import Navbar from "@/components/Navbar";
-import { resolveDisplayMake } from "@/lib/carCatalog";
-import { useLang } from "@/contexts/LanguageContext";
 import Link from "next/link";
+import { ArrowRight, Fuel, Wrench, TrendingDown, ShieldCheck, CheckCircle2, BookOpen } from "lucide-react";
+import Navbar from "@/components/Navbar";
+import { useLang } from "@/contexts/LanguageContext";
 
-interface PlateResult {
-  make: string; model: string; year: number;
-  trim: string; engineSize: number | null; fuelType: string;
-}
+// ── Example data (illustrative) ───────────────────────────────────────────────
+const EXAMPLE_CARS = [
+  {
+    name: "Dacia Duster 2019",
+    purchase: 68000,
+    annualFuel: 11200,
+    annualMaint: 5800,
+    annualDepr: 9520,
+    annualIns: 5100,
+    accent: "#d97706",
+    tag: { he: "הכי זול לקנייה", en: "Cheapest to buy" },
+  },
+  {
+    name: "Toyota Corolla 2020",
+    purchase: 95000,
+    annualFuel: 7200,
+    annualMaint: 3200,
+    annualDepr: 10450,
+    annualIns: 6400,
+    accent: "#2563eb",
+    tag: { he: "הכי זול לבעלות ✓", en: "Cheapest to own ✓" },
+    best: true,
+  },
+  {
+    name: "Skoda Octavia 2018",
+    purchase: 82000,
+    annualFuel: 8600,
+    annualMaint: 6200,
+    annualDepr: 11480,
+    annualIns: 5800,
+    accent: "#7c3aed",
+    tag: { he: "באמצע", en: "Middle ground" },
+  },
+];
 
-type Tab = "plate" | "manual";
+const HOLDING_YEARS = 5;
 
 export default function HomePage() {
-  const router = useRouter();
-  const { t } = useLang();
-  const [tab, setTab] = useState<Tab>("plate");
-  const [plate, setPlate] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<PlateResult | null>(null);
-  const [error, setError] = useState("");
+  const { t, lang } = useLang();
 
-  const lookup = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!plate.trim()) return;
-    setLoading(true); setError(""); setResult(null);
-    try {
-      const res = await fetch(`/api/car?plate=${encodeURIComponent(plate.trim())}`);
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? t("notFound")); return; }
-      setResult(data);
-    } catch { setError(t("networkError")); }
-    finally { setLoading(false); }
-  };
-
-  const goToCompare = () => {
-    if (!result) return;
-    const params = new URLSearchParams({
-      plate, make: result.make, model: result.model,
-      year: String(result.year), trim: result.trim,
-      engineSize: String(result.engineSize ?? ""), fuelType: result.fuelType,
-    });
-    router.push(`/compare?${params}`);
-  };
-
-  const englishMake = result ? resolveDisplayMake(result.make) : "";
-
-  const FEATURES = [
-    { icon: Fuel, color: "from-amber-500/20 to-amber-600/5", iconColor: "text-amber-400", title: t("fuelTitle"), desc: t("fuelDesc") },
-    { icon: TrendingDown, color: "from-orange-500/20 to-orange-600/5", iconColor: "text-orange-400", title: t("depreciationTitle"), desc: t("depreciationDesc") },
-    { icon: Wrench, color: "from-blue-500/20 to-blue-600/5", iconColor: "text-blue-400", title: t("maintenanceTitle"), desc: t("maintenanceDesc") },
-    { icon: BarChart3, color: "from-violet-500/20 to-violet-600/5", iconColor: "text-violet-400", title: t("tcoTitle"), desc: t("tcoDesc") },
+  const HIDDEN_COSTS = [
+    { icon: Fuel,         color: "#eab308", bg: "rgba(234,179,8,0.12)",   title: t("guideCostFuelTitle"),  desc: t("guideCostFuelDesc") },
+    { icon: Wrench,       color: "#3b82f6", bg: "rgba(59,130,246,0.12)",  title: t("guideCostMaintTitle"), desc: t("guideCostMaintDesc") },
+    { icon: TrendingDown, color: "#f97316", bg: "rgba(249,115,22,0.12)",  title: t("guideCostDeprTitle"),  desc: t("guideCostDeprDesc") },
+    { icon: ShieldCheck,  color: "#a78bfa", bg: "rgba(167,139,250,0.12)", title: t("guideCostInsTitle"),   desc: t("guideCostInsDesc") },
   ];
 
-  const STEPS = [
-    { step: "1", title: t("step1Title"), desc: t("step1Desc") },
-    { step: "2", title: t("step2Title"), desc: t("step2Desc") },
-    { step: "3", title: t("step3Title"), desc: t("step3Desc") },
+  const LESSONS = [
+    t("guideLessonsCheapest"),
+    t("guideLessonsReliable"),
+    t("guideLessonsDepreciation"),
+    t("guideLessonsData"),
   ];
+
+  const HOW_STEPS = [
+    { n: "1", title: t("guideHowStep1Title"), desc: t("guideHowStep1Desc") },
+    { n: "2", title: t("guideHowStep2Title"), desc: t("guideHowStep2Desc") },
+    { n: "3", title: t("guideHowStep3Title"), desc: t("guideHowStep3Desc") },
+  ];
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#070b14" }}>
-      {/* Background orbs */}
+      {/* Orbs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden>
-        <div className="orb-1 absolute -top-[200px] -right-[150px] w-[700px] h-[700px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 70%)", filter: "blur(40px)" }} />
-        <div className="orb-2 absolute -bottom-[200px] -left-[150px] w-[600px] h-[600px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(124,58,237,0.14) 0%, transparent 70%)", filter: "blur(40px)" }} />
-        <div className="orb-3 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(6,182,212,0.08) 0%, transparent 70%)", filter: "blur(60px)" }} />
+        <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(37,99,235,0.15) 0%, transparent 70%)", filter: "blur(60px)" }} />
+        <div className="absolute bottom-0 -left-40 w-[500px] h-[500px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%)", filter: "blur(60px)" }} />
       </div>
 
       <Navbar />
 
-      <main className="relative flex-1 flex flex-col items-center px-4 pt-16 pb-24">
+      <main className="relative flex-1 flex flex-col items-center px-4 pt-14 pb-24 gap-20">
 
-        {/* ── Hero ──────────────────────────────────────────────────────── */}
-        <div className="max-w-2xl w-full text-center animate-in">
-          {/* Live badge */}
-          <div className="inline-flex items-center gap-2.5 rounded-full px-4 py-1.5 mb-7 text-xs font-medium"
-            style={{ background: "rgba(37,99,235,0.1)", border: "1px solid rgba(59,130,246,0.25)", color: "#93c5fd" }}>
-            <span className="relative flex h-2 w-2">
-              <span className="ping-slow absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
-            </span>
-            {t("liveBadge")}
+        {/* ── Hero ──────────────────────────────────────────────────────────── */}
+        <section className="max-w-2xl w-full text-center animate-in">
+          <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 mb-6 text-xs font-medium"
+            style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.25)", color: "#93c5fd" }}>
+            <BookOpen size={12} />
+            {t("guideBadge")}
           </div>
-
-          <h1 className="text-5xl md:text-[4rem] lg:text-[4.5rem] font-extrabold tracking-tight leading-[1.08] text-white mb-4">
-            {t("heroTitle")}{" "}
-            <span style={{ background: "linear-gradient(135deg,#60a5fa,#34d399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              {t("heroGradient")}
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight text-white mb-4">
+            {t("guideHeroTitle")}{" "}
+            <span style={{ background: "linear-gradient(135deg,#f97316,#ef4444)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              {t("guideHeroGradient")}
             </span>
-            <br />{t("heroTitle2")}
           </h1>
-          <p className="text-slate-400 text-lg max-w-xl mx-auto mb-5 leading-relaxed">
-            {t("heroSub")}
+          <p className="text-slate-400 text-lg leading-relaxed max-w-xl mx-auto">
+            {t("guideHeroSub")}
           </p>
+        </section>
 
-          {/* Value proposition callout */}
-          <div className="inline-flex items-center gap-3 rounded-2xl px-5 py-3 mb-10 text-sm"
-            style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.18)" }}>
-            <span className="text-emerald-400 font-semibold shrink-0">{t("exampleLabel")}</span>
-            <span className="text-slate-400">{t("exampleText")}</span>
+        {/* ── Hidden costs ──────────────────────────────────────────────────── */}
+        <section className="max-w-3xl w-full">
+          <div className="text-center mb-8">
+            <h2 className="text-white text-2xl font-bold mb-2">{t("guideWhyTitle")}</h2>
+            <p className="text-slate-500 text-sm">{t("guideWhySub")}</p>
           </div>
-
-          {/* ── Input card ──────────────────────────────────────────────── */}
-          <div className="max-w-lg mx-auto card-glow">
-            {/* Tabs */}
-            <div className="flex border-b" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
-              <button
-                onClick={() => { setTab("plate"); setResult(null); setError(""); }}
-                className="flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors"
-                style={{
-                  color: tab === "plate" ? "#60a5fa" : "#64748b",
-                  borderBottom: tab === "plate" ? "2px solid #3b82f6" : "2px solid transparent",
-                  marginBottom: "-1px",
-                }}
-              >
-                <Search size={14} />
-                {t("tabPlate")}
-              </button>
-              <button
-                onClick={() => { setTab("manual"); setResult(null); setError(""); }}
-                className="flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors"
-                style={{
-                  color: tab === "manual" ? "#60a5fa" : "#64748b",
-                  borderBottom: tab === "manual" ? "2px solid #3b82f6" : "2px solid transparent",
-                  marginBottom: "-1px",
-                }}
-              >
-                <SlidersHorizontal size={14} />
-                {t("tabManual")}
-              </button>
-            </div>
-
-            <div className="p-6">
-              {tab === "plate" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {HIDDEN_COSTS.map(({ icon: Icon, color, bg, title, desc }) => (
+              <div key={title} className="rounded-2xl p-5 flex gap-4"
+                style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: bg }}>
+                  <Icon size={20} style={{ color }} />
+                </div>
                 <div>
-                  <p className="text-slate-500 text-sm mb-4">{t("plateInputHint")}</p>
-                  <form onSubmit={lookup} className="space-y-3">
-                    {/* Plate input — always LTR */}
-                    <div className="relative rounded-xl overflow-hidden shadow-xl"
-                      style={{ border: "2px solid rgba(255,255,255,0.12)" }} dir="ltr">
-                      <div className="flex items-stretch">
-                        <div className="flex flex-col items-center justify-center gap-0.5 px-3.5 shrink-0 self-stretch"
-                          style={{ background: "linear-gradient(180deg,#1e3a8a,#1e40af)", borderRight: "2px solid rgba(255,255,255,0.15)" }}>
-                          <span className="text-white text-[9px] leading-none mb-0.5">✡</span>
-                          <span className="text-white text-[10px] font-black tracking-widest leading-none">IL</span>
-                        </div>
-                        <input
-                          type="text"
-                          value={plate}
-                          onChange={(e) => { setPlate(e.target.value); setResult(null); setError(""); }}
-                          onKeyDown={(e) => e.key === "Enter" && lookup()}
-                          placeholder="123-45-678"
-                          maxLength={12}
-                          className="flex-1 text-center text-2xl font-black tracking-[0.22em] py-3.5 focus:outline-none"
-                          style={{ background: "#f8f6ee", color: "#111", caretColor: "#2563eb" }}
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading || !plate.trim()}
-                      className="btn-primary w-full py-3 text-sm"
-                    >
-                      {loading
-                        ? <><Loader2 size={16} className="animate-spin" /> {t("lookingUp")}</>
-                        : <><Zap size={15} /> {t("lookupBtn")}</>
-                      }
-                    </button>
-                  </form>
-
-                  {error && (
-                    <div className="mt-3 flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm animate-in"
-                      style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5" }}>
-                      <AlertCircle size={15} className="shrink-0" />
-                      {error}
-                    </div>
-                  )}
-
-                  {result && (
-                    <div className="mt-4 animate-in">
-                      <div className="rounded-xl p-4 mb-3"
-                        style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)" }}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <ShieldCheck size={14} className="text-emerald-400" />
-                          <span className="text-emerald-400 text-xs font-semibold uppercase tracking-wider">{t("vehicleFound")}</span>
-                        </div>
-                        <p className="text-white text-lg font-bold">
-                          {result.year} {englishMake} {result.model}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {result.trim && (
-                            <span className="text-xs rounded-full px-2.5 py-0.5 font-medium"
-                              style={{ background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)", color: "#93c5fd" }}>
-                              {result.trim}
-                            </span>
-                          )}
-                          {result.engineSize && (
-                            <span className="text-xs rounded-full px-2.5 py-0.5"
-                              style={{ background: "rgba(255,255,255,0.07)", color: "#94a3b8" }}>
-                              {result.engineSize}L
-                            </span>
-                          )}
-                          {result.fuelType && (
-                            <span className="text-xs rounded-full px-2.5 py-0.5"
-                              style={{ background: "rgba(255,255,255,0.07)", color: "#94a3b8" }}>
-                              {result.fuelType}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <button onClick={goToCompare} className="btn-success w-full py-3.5 text-base font-bold">
-                        {t("startTCO")} <ArrowRight size={18} />
-                      </button>
-                    </div>
-                  )}
+                  <h3 className="text-white font-semibold text-sm mb-1">{title}</h3>
+                  <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
                 </div>
-              ) : (
-                <div className="text-center py-2">
-                  <div className="w-14 h-14 rounded-2xl mx-auto mb-5 flex items-center justify-center"
-                    style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
-                    <BarChart3 className="text-blue-400" size={26} />
-                  </div>
-                  <h3 className="text-white font-bold text-lg mb-2">{t("manualTitle")}</h3>
-                  <p className="text-slate-500 text-sm mb-6 leading-relaxed">{t("manualDesc")}</p>
-                  <Link href="/compare" className="btn-primary w-full py-3.5 text-base font-bold inline-flex items-center justify-center gap-2">
-                    {t("openCompareTool")} <ArrowRight size={18} />
-                  </Link>
-                  <p className="text-slate-600 text-xs mt-4">{t("manualHint")}</p>
-                </div>
-              )}
-            </div>
+              </div>
+            ))}
           </div>
-        </div>
+        </section>
 
-        {/* ── How it works ────────────────────────────────────────────── */}
-        <div className="mt-16 max-w-2xl w-full animate-in delay-150">
-          <p className="text-center text-xs font-semibold uppercase tracking-widest mb-6" style={{ color: "#475569" }}>{t("howItWorks")}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {STEPS.map(({ step, title, desc }) => (
-              <div key={step} className="rounded-2xl p-5 text-center"
+        {/* ── Example comparison ────────────────────────────────────────────── */}
+        <section className="max-w-3xl w-full">
+          <div className="text-center mb-8">
+            <h2 className="text-white text-2xl font-bold mb-2">{t("guideExampleTitle")}</h2>
+            <p className="text-slate-500 text-sm">{t("guideExampleSub")}</p>
+          </div>
+
+          {/* Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {EXAMPLE_CARS.map((car) => {
+              const annual = car.annualFuel + car.annualMaint + car.annualDepr + car.annualIns;
+              const total5yr = annual * HOLDING_YEARS;
+              return (
+                <div key={car.name} className="rounded-2xl overflow-hidden flex flex-col"
+                  style={{
+                    background: car.best ? "rgba(37,99,235,0.08)" : "rgba(255,255,255,0.025)",
+                    border: `1px solid ${car.best ? "rgba(37,99,235,0.35)" : "rgba(255,255,255,0.07)"}`,
+                  }}>
+                  <div className="h-1 w-full" style={{ background: car.accent }} />
+                  <div className="p-5 flex-1 flex flex-col gap-3">
+                    {/* Name + tag */}
+                    <div>
+                      <p className="text-white font-bold text-sm">{car.name}</p>
+                      <span className="text-xs font-semibold mt-1 inline-block rounded-full px-2.5 py-0.5"
+                        style={{
+                          background: car.best ? "rgba(37,99,235,0.2)" : "rgba(255,255,255,0.06)",
+                          color: car.best ? "#93c5fd" : "#64748b",
+                        }}>
+                        {lang === "he" ? car.tag.he : car.tag.en}
+                      </span>
+                    </div>
+
+                    {/* Purchase price */}
+                    <div className="rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.04)" }}>
+                      <p className="text-slate-500 text-xs mb-0.5">{lang === "he" ? "מחיר קנייה" : "Purchase price"}</p>
+                      <p className="text-white font-bold text-base">{fmt(car.purchase)}</p>
+                    </div>
+
+                    {/* Annual breakdown */}
+                    <div className="space-y-1.5">
+                      {[
+                        { label: lang === "he" ? "דלק" : "Fuel",            value: car.annualFuel,  color: "#eab308" },
+                        { label: lang === "he" ? "תחזוקה" : "Maintenance",  value: car.annualMaint, color: "#3b82f6" },
+                        { label: lang === "he" ? "פחת" : "Depreciation",    value: car.annualDepr,  color: "#f97316" },
+                        { label: lang === "he" ? "ביטוח" : "Insurance",     value: car.annualIns,   color: "#a78bfa" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: color }} />
+                            {label}
+                          </span>
+                          <span className="text-slate-300 font-medium tabular-nums">{fmt(value)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+
+                    {/* Totals */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">{lang === "he" ? "עלות שנתית" : "Annual cost"}</span>
+                        <span className="text-white font-semibold tabular-nums">{fmt(annual)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400 font-medium">{lang === "he" ? `סה"כ ${HOLDING_YEARS} שנים` : `Total ${HOLDING_YEARS} years`}</span>
+                        <span className="font-extrabold tabular-nums" style={{ color: car.accent }}>{fmt(total5yr)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Insight callout */}
+          <div className="rounded-2xl px-6 py-5"
+            style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)" }}>
+            <p className="text-emerald-400 font-bold text-base mb-1">
+              {lang === "he"
+                ? "טויוטה קורולה חוסכת ~₪27,000 על פני 5 שנים — למרות שעלתה ₪27,000 יותר לקנייה"
+                : "Toyota Corolla saves ~₪27,000 over 5 years — despite costing ₪27,000 more to buy"}
+            </p>
+            <p className="text-slate-500 text-sm">{t("guideExampleNote")}</p>
+          </div>
+        </section>
+
+        {/* ── Lessons ───────────────────────────────────────────────────────── */}
+        <section className="max-w-2xl w-full">
+          <h2 className="text-white text-2xl font-bold mb-6 text-center">{t("guideLessonsTitle")}</h2>
+          <div className="space-y-3">
+            {LESSONS.map((lesson, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-2xl px-5 py-4"
                 style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-3 text-sm font-bold"
-                  style={{ background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)", color: "#60a5fa" }}>
-                  {step}
+                <CheckCircle2 size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+                <p className="text-slate-300 text-sm leading-relaxed">{lesson}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── How to use ────────────────────────────────────────────────────── */}
+        <section className="max-w-2xl w-full">
+          <h2 className="text-white text-2xl font-bold mb-6 text-center">{t("guideHowTitle")}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {HOW_STEPS.map(({ n, title, desc }) => (
+              <div key={n} className="rounded-2xl p-5 text-center"
+                style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center mx-auto mb-3 text-sm font-bold"
+                  style={{ background: "rgba(37,99,235,0.15)", border: "1px solid rgba(59,130,246,0.3)", color: "#60a5fa" }}>
+                  {n}
                 </div>
                 <h3 className="text-white font-semibold text-sm mb-1.5">{title}</h3>
                 <p className="text-slate-500 text-xs leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* ── Feature grid ──────────────────────────────────────────────── */}
-        <div className="mt-10 max-w-3xl w-full grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in delay-200">
-          <div className="sm:col-span-2 text-center mb-1">
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#475569" }}>{t("whatsFactoredIn")}</p>
+        {/* ── CTA ───────────────────────────────────────────────────────────── */}
+        <section className="max-w-md w-full text-center">
+          <div className="rounded-3xl px-8 py-10"
+            style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(59,130,246,0.2)" }}>
+            <h2 className="text-white text-xl font-bold mb-4">{t("guideCtaTitle")}</h2>
+            <Link href="/compare" className="btn-primary inline-flex items-center gap-2 px-8 py-3.5 text-base font-bold rounded-2xl">
+              {t("guideCtaBtn")} <ArrowRight size={18} />
+            </Link>
           </div>
-          {FEATURES.map(({ icon: Icon, color, iconColor, title, desc }) => (
-            <div key={title} className="group rounded-2xl p-5 flex gap-4 transition-all duration-200 cursor-default"
-              style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)")}>
-              <div className={`rounded-xl p-2.5 shrink-0 h-fit bg-gradient-to-br ${color}`}>
-                <Icon className={iconColor} size={20} />
-              </div>
-              <div>
-                <h3 className="text-white font-semibold text-sm mb-1">{title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        </section>
 
       </main>
     </div>
