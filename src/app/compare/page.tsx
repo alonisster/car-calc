@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Plus, X, Fuel, Wrench, TrendingDown, RefreshCw,
   Loader2, Search, AlertCircle, ChevronDown, ChevronUp,
-  Pencil, Check, RotateCcw, Car, ShieldCheck,
+  Pencil, Check, RotateCcw, Car, ShieldCheck, Save, FolderOpen,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import SearchSelect, { type SelectOption } from "@/components/SearchSelect";
 import { calculateTCO, estimateInsurance, formatILS, type CarInput, type TCOResult, type TCOOverrides } from "@/lib/tco";
 import { MAKES, MODELS_BY_MAKE, resolveDisplayMake } from "@/lib/carCatalog";
+import { supabase } from "@/lib/supabase";
 
 // ── Option lists ──────────────────────────────────────────────────────────────
 const MAKE_OPTIONS: SelectOption[] = MAKES.map((m) => ({
@@ -536,6 +537,17 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
   );
 }
 
+// ── Serialise/deserialise draft (strip transient UI state) ────────────────────
+type DraftCar = Omit<CarEntry, "loadingPlate" | "plateError">;
+function toDraft(c: CarEntry): DraftCar {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { loadingPlate, plateError, ...rest } = c;
+  return rest;
+}
+function fromDraft(d: DraftCar): CarEntry {
+  return { ...d, loadingPlate: false, plateError: "" };
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 function ComparePageInner() {
   const searchParams = useSearchParams();
@@ -550,6 +562,52 @@ function ComparePageInner() {
   });
   const [cars, setCars] = useState<CarEntry[]>([initialCar]);
   const fuelPrices = { petrol: 7.5, diesel: 7.2 };
+
+  // ── Save / load state ──────────────────────────────────────────────────────
+  const [userId, setUserId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ cars: DraftCar[]; savedAt: string } | null>(null);
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  // On mount: get session + fetch saved draft
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const uid = data.session?.user.id ?? null;
+      setUserId(uid);
+      if (!uid) return;
+      supabase
+        .from("saved_comparisons")
+        .select("cars_data, updated_at")
+        .eq("user_id", uid)
+        .maybeSingle()
+        .then(({ data: row }) => {
+          if (row) {
+            setDraft({ cars: row.cars_data as DraftCar[], savedAt: row.updated_at });
+            setShowDraftBanner(true);
+          }
+        });
+    });
+  }, []);
+
+  const saveComparison = useCallback(async () => {
+    if (!userId) return;
+    setSaveStatus("saving");
+    const { error } = await supabase
+      .from("saved_comparisons")
+      .upsert({ user_id: userId, cars_data: cars.map(toDraft), updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (error) { setSaveStatus("error"); setTimeout(() => setSaveStatus("idle"), 3000); }
+    else {
+      setSaveStatus("saved");
+      setDraft({ cars: cars.map(toDraft), savedAt: new Date().toISOString() });
+      setTimeout(() => setSaveStatus("idle"), 2500);
+    }
+  }, [userId, cars]);
+
+  const loadDraft = () => {
+    if (!draft) return;
+    setCars(draft.cars.map(fromDraft));
+    setShowDraftBanner(false);
+  };
 
   const updateCar = (id: string, updates: Partial<CarEntry>) =>
     setCars((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
@@ -575,6 +633,34 @@ function ComparePageInner() {
       <Navbar />
 
       <main className="relative flex-1 px-4 py-8 max-w-7xl mx-auto w-full">
+
+        {/* ── Saved draft banner ──────────────────────────────────────────── */}
+        {showDraftBanner && draft && (
+          <div className="mb-6 rounded-xl px-5 py-4 flex items-center justify-between gap-4 animate-in"
+            style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.25)" }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <FolderOpen size={16} className="text-blue-400 shrink-0" />
+              <div>
+                <p className="text-white text-sm font-semibold">You have a saved comparison</p>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Saved {new Date(draft.savedAt).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {" · "}{draft.cars.length} car{draft.cars.length > 1 ? "s" : ""}
+                  {draft.cars.filter(c => c.make).map(c => ` · ${c.make} ${c.model}`).join("")}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={loadDraft} className="btn-primary !py-2 !px-4 !text-xs !rounded-lg">
+                <FolderOpen size={13} /> Load Draft
+              </button>
+              <button onClick={() => setShowDraftBanner(false)}
+                className="p-1.5 rounded-lg text-slate-600 hover:text-white transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Page header */}
         <div className="flex items-end justify-between mb-8">
           <div>
@@ -585,15 +671,29 @@ function ComparePageInner() {
               <span className="ml-1">(editable per car below)</span>
             </p>
           </div>
-          {cars.length < 3 && (
-            <button onClick={addCar}
-              className="flex items-center gap-2 text-sm font-medium rounded-xl px-4 py-2.5 transition-all"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.15)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8"; }}>
-              <Plus size={15} /> Add Car
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {userId && (
+              <button onClick={saveComparison} disabled={saveStatus === "saving"}
+                className="flex items-center gap-2 text-sm font-medium rounded-xl px-4 py-2.5 transition-all"
+                style={{
+                  background: saveStatus === "saved" ? "rgba(16,185,129,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.1)" : "rgba(59,130,246,0.1)",
+                  border: `1px solid ${saveStatus === "saved" ? "rgba(16,185,129,0.3)" : saveStatus === "error" ? "rgba(239,68,68,0.25)" : "rgba(59,130,246,0.25)"}`,
+                  color: saveStatus === "saved" ? "#6ee7b7" : saveStatus === "error" ? "#fca5a5" : "#93c5fd",
+                }}>
+                {saveStatus === "saving" ? <Loader2 size={14} className="animate-spin" /> : saveStatus === "saved" ? <Check size={14} /> : <Save size={14} />}
+                {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Error" : "Save"}
+              </button>
+            )}
+            {cars.length < 3 && (
+              <button onClick={addCar}
+                className="flex items-center gap-2 text-sm font-medium rounded-xl px-4 py-2.5 transition-all"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.15)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8"; }}>
+                <Plus size={15} /> Add Car
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Cards grid */}
@@ -624,6 +724,20 @@ function ComparePageInner() {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Purchase price row — from CarEntry, not TCOResult */}
+                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <td className="px-6 py-3 text-slate-500 text-xs">Purchase price</td>
+                    {cars.map((c, i) => {
+                      const prices = cars.map(x => x.purchasePrice);
+                      const best = Math.min(...prices);
+                      return (
+                        <td key={c.id} className="px-6 py-3 text-right text-xs font-bold tabular-nums"
+                          style={{ color: c.purchasePrice === best ? "#34d399" : "#e2e8f0" }}>
+                          {formatILS(c.purchasePrice)}
+                        </td>
+                      );
+                    })}
+                  </tr>
                   {(
                     [
                       { label: "Monthly TCO",         key: "monthlyTCO",               fmt: formatILS,                                bestIsMin: true  },
