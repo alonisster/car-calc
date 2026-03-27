@@ -8,22 +8,22 @@ const he = {
   langToggle: "EN",
 
   // Landing — hero
-  liveBadge: "מאגר רישוי ישראלי — נתונים חיים",
-  heroTitle: "דע את",
+  liveBadge: "מאגר רישוי ישראלי — נתונים בלייב",
+  heroTitle: "גלה את",
   heroGradient: "העלות האמיתית",
   heroTitle2: "של כל רכב",
-  heroSub: "מחיר המדבקה הוא רק ההתחלה. השווה עד 3 רכבים ורואה את העלות השנתית האמיתית — דלק, תחזוקה, פחת וביטוח — מותאמת לשוק הישראלי.",
+  heroSub: "מחיר הקניה הוא רק ההתחלה. השווה עד 3 רכבים ורואה את העלות השנתית האמיתית — דלק, תחזוקה, פחת וביטוח — מותאמת לשוק הישראלי.",
   exampleLabel: "דוגמה:",
   exampleText: "מאזדה 3 ב-₪90,000 יכולה לעלות ₪12,000 בשנה פחות מדאציה דאסטר ב-₪75,000.",
 
   // Landing — how it works
-  howItWorks: "איך זה עובד",
+  howItWorks: "?איך זה עובד",
   step1Title: "הוסף רכבים",
   step1Desc: "חפש לפי מספר לוחית ישראלי או בחר יצרן, דגם ושנה ידנית. ניתן להוסיף עד 3 רכבים.",
-  step2Title: "הגדר הנחות",
+  step2Title: "הגדר הנחות בסיס",
   step2Desc: "התאם מחיר רכישה, ק\"מ שנתי, מחיר דלק ופחת לפי המצב שלך.",
   step3Title: "השווה עלויות אמיתיות",
-  step3Desc: "ראה TCO שנתי וחודשי זה לצד זה. גלה איזה רכב באמת זול יותר לאחזקה.",
+  step3Desc: "גלה עלות כוללת שנתית וחודשית זה לצד זה. גלה איזה רכב באמת זול יותר לאחזקה.",
 
   // Landing — features
   whatsFactoredIn: "מה כלול בחישוב",
@@ -33,7 +33,7 @@ const he = {
   depreciationDesc: "ירידת ערך שנתית על בסיס מגמות שוק יד2 — 10–16% לשנה לפי יצרן.",
   maintenanceTitle: "תחזוקה חכמה",
   maintenanceDesc: "נוסחת גיל × ציון אמינות. פיאט ב-12 שנה עולה 2.4× יותר מטויוטה ב-12 שנה.",
-  tcoTitle: "השוואת TCO",
+  tcoTitle: "השוואת עלות כוללת",
   tcoDesc: "השווה עד 3 רכבים עם הנחות הניתנות לעריכה ופירוט עלויות מלא.",
 
   // Landing — input card
@@ -43,9 +43,9 @@ const he = {
   lookupBtn: "חפש רכב",
   lookingUp: "מחפש...",
   vehicleFound: "רכב נמצא",
-  startTCO: "התחל השוואת TCO",
+  startTCO: "התחל השוואת עלות כוללת",
   manualTitle: "בחר רכבים, השווה עלויות",
-  manualDesc: "בחר יצרן, דגם, שנה ומחיר רכישה עבור עד 3 רכבים. נחשב TCO מלא כולל דלק, תחזוקה ופחת.",
+  manualDesc: "בחר יצרן, דגם, שנה ומחיר רכישה עבור עד 3 רכבים. נחשב עלות כוללת מלאה כולל דלק, תחזוקה ופחת.",
   openCompareTool: "פתח כלי השוואה",
   manualHint: "ניתן גם לחפש לפי לוחית בדף ההשוואה להוסיף רכב שני או שלישי.",
 
@@ -76,7 +76,7 @@ const he = {
   purchasePriceLbl: "מחיר רכישה (₪)",
   annualMileageLbl: "ק\"מ שנתי",
   holdingPeriodLbl: "תקופת אחזקה (שנים)",
-  calculateTCO: "חשב TCO",
+  calculateTCO: "חשב עלות כוללת",
   requiredFields: "שדות חובה:",
   carLabel: "רכב",
 
@@ -95,18 +95,18 @@ const he = {
   fuelEfficiency: "צריכת דלק אמיתית",
   fuelPriceLbl: "מחיר דלק (₪/L)",
   insuranceLbl: "ביטוח (מקיף + חובה) / שנה",
-  applyCalculate: "החל וחשב TCO",
-  recalculate: "חשב מחדש TCO",
+  applyCalculate: "החל וחשב עלות כוללת",
+  recalculate: "חשב מחדש עלות כוללת",
   enterManually: "הזן ידנית",
   editBtn: "ערוך",
   est: "הערכה",
 
   // Compare — results
   results: "תוצאות",
-  monthlyTCO: "TCO חודשי",
-  annualTCO: "TCO שנתי",
+  monthlyTCO: "עלות כוללת חודשית",
+  annualTCO: "עלות כוללת שנתית",
   mo: "חודש",
-  residualValue: "ערך שיורי",
+  residualValue: "מחיר מכירה בסוף התקופה",
   depreciationRate: "שיעור פחת",
   officialFuel: "צריכה רשמית",
   realWorldFuel: "צריכה אמיתית",
@@ -124,15 +124,15 @@ const he = {
   bestValueHint: "ירוק = ערך הטוב ביותר בכל שורה",
   metric: "מדד",
   purchasePriceRow: "מחיר רכישה",
-  monthlyTCORow: "TCO חודשי",
-  annualTCORow: "TCO שנתי",
+  monthlyTCORow: "עלות כוללת חודשי",
+  annualTCORow: "עלות כוללת שנתי",
   depreciationRow: "פחת / שנה",
   fuelRow: "דלק / שנה",
   maintenanceRow: "תחזוקה / שנה",
   insuranceRow: "ביטוח / שנה",
   officialFuelRow: "צריכה רשמית",
   realWorldRow: "צריכה אמיתית",
-  residualRow: "ערך שיורי",
+  residualRow: "מחיר מכירה בסוף התקופה",
   reliabilityRow: "אמינות",
   resaleRow: "ציון מכירה",
   disclaimer: "הערכות מבוססות על נתוני שוק ישראלי. מחיר דלק ברירת מחדל ₪7.50/L — ניתן לשנות לכל רכב בנפרד. עלויות בפועל עשויות להשתנות.",
@@ -160,7 +160,7 @@ const he = {
   atLeast6: "לפחות 6 תווים",
   creatingAccount: "יוצר חשבון...",
   createAccountBtn: "יצירת חשבון",
-} as const;
+};
 
 const en: typeof he = {
   signIn: "Sign in",

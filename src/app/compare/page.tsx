@@ -395,17 +395,18 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
           {/* Financial */}
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("purchasePriceLbl")} required>
-              <input type="number" step="1000" min="0" dir="ltr" value={car.purchasePrice || ""} placeholder="120,000" className="input-dark"
+              <input type="number" step="1000" min="0" dir="ltr" value={car.purchasePrice || ""} placeholder="לדוגמא: 120,000" className="input-dark"
                 onChange={(e) => onUpdate(car.id, { purchasePrice: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
             </Field>
             <Field label={t("annualMileageLbl")} required>
-              <input type="number" step="1000" min="0" dir="ltr" value={car.annualMileageKm || ""} placeholder="15,000" className="input-dark"
+              <input type="number" step="1000" min="0" dir="ltr" value={car.annualMileageKm || ""} placeholder="לדוגמא: 15,000" className="input-dark"
                 onChange={(e) => onUpdate(car.id, { annualMileageKm: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
             </Field>
           </div>
           <Field label={t("holdingPeriodLbl")}>
-            <input type="number" min="1" max="15" dir="ltr" value={car.holdingPeriodYears} className="input-dark"
-              onChange={(e) => onUpdate(car.id, { holdingPeriodYears: parseInt(e.target.value) || 1, estimates: null, tco: null })} />
+            <input type="number" min="1" max="15" dir="ltr" value={car.holdingPeriodYears || ""} className="input-dark"
+              onChange={(e) => onUpdate(car.id, { holdingPeriodYears: parseInt(e.target.value) || 0, estimates: null, tco: null })}
+              onBlur={(e) => { if (!parseInt(e.target.value)) onUpdate(car.id, { holdingPeriodYears: 1 }); }} />
           </Field>
 
           <button onClick={handleEstimate} disabled={!ready}
