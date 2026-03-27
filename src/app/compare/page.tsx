@@ -65,6 +65,14 @@ const CARD_ACCENTS = [
   { from: "#d97706", to: "#dc2626" },
 ];
 
+// ── Validation helper ─────────────────────────────────────────────────────────
+function rangeMsg(min: number, max: number, lang: string): string {
+  const fmt = (n: number) => n.toLocaleString(lang === "he" ? "he-IL" : "en-US");
+  return lang === "he"
+    ? `חייב להיות בין ${fmt(min)} ל-${fmt(max)}`
+    : `Must be between ${fmt(min)} and ${fmt(max)}`;
+}
+
 // ── ScoreBar ──────────────────────────────────────────────────────────────────
 function ScoreBar({ score, label }: { score: number; label: string }) {
   const pct = (score / 10) * 100;
@@ -124,21 +132,30 @@ function CostBreakdown({ tco }: { tco: TCOResult }) {
 // ── EstimateRow ───────────────────────────────────────────────────────────────
 function EstimateRow({
   icon: Icon, iconColor, label, estimatedDisplay, unit,
-  manualValue, onSave, onReset,
+  manualValue, onSave, onReset, min, max,
 }: {
   icon: React.ElementType; iconColor: string;
   label: string; estimatedDisplay: string; unit: string;
   manualValue: string | null;
   onSave: (v: string) => void; onReset: () => void;
+  min?: number; max?: number;
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const isOverridden = manualValue !== null;
 
   const handleSave = () => {
     const n = parseFloat(input.replace(/,/g, ""));
-    if (!isNaN(n) && n > 0) { onSave(String(n)); setEditing(false); }
+    if (isNaN(n) || n <= 0) return;
+    if (min !== undefined && max !== undefined && (n < min || n > max)) {
+      setFieldError(rangeMsg(min, max, lang));
+      return;
+    }
+    setFieldError(null);
+    onSave(String(n));
+    setEditing(false);
   };
 
   return (
@@ -158,16 +175,23 @@ function EstimateRow({
         <div className="flex-1 min-w-0">
           <p className="text-slate-500 text-xs mb-0.5">{label}</p>
           {editing ? (
-            <div className="flex items-center gap-2 mt-1">
-              <input type="number" autoFocus value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setEditing(false); }}
-                placeholder={`Enter ${unit}`}
-                className="w-28 rounded-lg px-2.5 py-1 text-sm text-white focus:outline-none"
-                style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(59,130,246,0.5)" }} />
-              <span className="text-slate-500 text-xs">{unit}</span>
-              <button onClick={handleSave} className="text-emerald-400 hover:text-emerald-300 transition-colors"><Check size={14} /></button>
-              <button onClick={() => setEditing(false)} className="text-slate-600 hover:text-white transition-colors"><X size={13} /></button>
+            <div className="mt-1">
+              <div className="flex items-center gap-2">
+                <input type="number" autoFocus value={input} dir="ltr"
+                  onChange={(e) => { setInput(e.target.value); setFieldError(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditing(false); setFieldError(null); } }}
+                  placeholder={`${min ?? ""}–${max ?? ""}`}
+                  className="w-28 rounded-lg px-2.5 py-1 text-sm text-white focus:outline-none"
+                  style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${fieldError ? "rgba(239,68,68,0.6)" : "rgba(59,130,246,0.5)"}` }} />
+                <span className="text-slate-500 text-xs">{unit}</span>
+                <button onClick={handleSave} className="text-emerald-400 hover:text-emerald-300 transition-colors"><Check size={14} /></button>
+                <button onClick={() => { setEditing(false); setFieldError(null); }} className="text-slate-600 hover:text-white transition-colors"><X size={13} /></button>
+              </div>
+              {fieldError && (
+                <p className="text-red-400 text-xs mt-1 flex items-center gap-1">
+                  <AlertCircle size={11} />{fieldError}
+                </p>
+              )}
             </div>
           ) : (
             <div className="flex items-baseline gap-2">
@@ -228,7 +252,7 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
   onRemove: (id: string) => void; canRemove: boolean;
   fuelPrices: { petrol: number; diesel: number };
 }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [showInputs, setShowInputs] = useState(true);
   const [plateInput, setPlateInput] = useState(car.plate);
   const accent = CARD_ACCENTS[index % CARD_ACCENTS.length];
@@ -289,6 +313,11 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
 
   const ready = isReady(car);
   const missingFields = [!car.make && t("fieldMake"), !car.model && t("fieldModel"), (!car.year || car.year <= 1990) && t("fieldYear"), !car.purchasePrice && t("fieldPrice"), !car.annualMileageKm && t("fieldMileage")].filter(Boolean) as string[];
+
+  const priceError   = car.purchasePrice > 0   && (car.purchasePrice < 5_000   || car.purchasePrice > 1_000_000) ? rangeMsg(5_000, 1_000_000, lang) : null;
+  const mileageError = car.annualMileageKm > 0 && (car.annualMileageKm < 2_000 || car.annualMileageKm > 80_000)  ? rangeMsg(2_000, 80_000, lang)    : null;
+  const periodError  = car.holdingPeriodYears > 0 && (car.holdingPeriodYears < 1 || car.holdingPeriodYears > 20) ? rangeMsg(1, 20, lang)             : null;
+  const hasRangeErrors = !!(priceError || mileageError || periodError);
   const carTitle = car.make && car.model ? `${car.year} ${car.make} ${car.model}` : `${t("carLabel")} ${index + 1}`;
 
   return (
@@ -394,22 +423,34 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
 
           {/* Financial */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t("purchasePriceLbl")} required>
-              <input type="number" step="1000" min="0" dir="ltr" value={car.purchasePrice || ""} placeholder="לדוגמא: 120,000" className="input-dark"
-                onChange={(e) => onUpdate(car.id, { purchasePrice: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
-            </Field>
-            <Field label={t("annualMileageLbl")} required>
-              <input type="number" step="1000" min="0" dir="ltr" value={car.annualMileageKm || ""} placeholder="לדוגמא: 15,000" className="input-dark"
-                onChange={(e) => onUpdate(car.id, { annualMileageKm: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
-            </Field>
+            <div>
+              <Field label={t("purchasePriceLbl")} required>
+                <input type="number" step="1000" min="0" dir="ltr" value={car.purchasePrice || ""} placeholder="לדוגמא: 120,000"
+                  className={`input-dark ${priceError ? "border-red-500/50" : ""}`}
+                  onChange={(e) => onUpdate(car.id, { purchasePrice: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
+              </Field>
+              {priceError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{priceError}</p>}
+            </div>
+            <div>
+              <Field label={t("annualMileageLbl")} required>
+                <input type="number" step="1000" min="0" dir="ltr" value={car.annualMileageKm || ""} placeholder="לדוגמא: 15,000"
+                  className={`input-dark ${mileageError ? "border-red-500/50" : ""}`}
+                  onChange={(e) => onUpdate(car.id, { annualMileageKm: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
+              </Field>
+              {mileageError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{mileageError}</p>}
+            </div>
           </div>
-          <Field label={t("holdingPeriodLbl")}>
-            <input type="number" min="1" max="15" dir="ltr" value={car.holdingPeriodYears || ""} className="input-dark"
-              onChange={(e) => onUpdate(car.id, { holdingPeriodYears: parseInt(e.target.value) || 0, estimates: null, tco: null })}
-              onBlur={(e) => { if (!parseInt(e.target.value)) onUpdate(car.id, { holdingPeriodYears: 1 }); }} />
-          </Field>
+          <div>
+            <Field label={t("holdingPeriodLbl")}>
+              <input type="number" min="1" max="20" dir="ltr" value={car.holdingPeriodYears || ""}
+                className={`input-dark ${periodError ? "border-red-500/50" : ""}`}
+                onChange={(e) => onUpdate(car.id, { holdingPeriodYears: parseInt(e.target.value) || 0, estimates: null, tco: null })}
+                onBlur={(e) => { if (!parseInt(e.target.value)) onUpdate(car.id, { holdingPeriodYears: 1 }); }} />
+            </Field>
+            {periodError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{periodError}</p>}
+          </div>
 
-          <button onClick={handleEstimate} disabled={!ready}
+          <button onClick={handleEstimate} disabled={!ready || hasRangeErrors}
             title={!ready ? `${t("requiredFields")} ${missingFields.join(", ")}` : undefined}
             className="btn-primary w-full py-3">
             <RefreshCw size={14} /> {t("calculateTCO")}
@@ -439,27 +480,32 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
           <EstimateRow icon={Wrench} iconColor="#3b82f6" label={t("maintenanceYr")}
             estimatedDisplay={formatILS(car.estimates.maintenanceILS)} unit="₪/yr"
             manualValue={car.overrides.maintenanceILS != null ? String(car.overrides.maintenanceILS) : null}
-            onSave={(v) => setOverride("maintenanceILS", v)} onReset={() => clearOverride("maintenanceILS")} />
+            onSave={(v) => setOverride("maintenanceILS", v)} onReset={() => clearOverride("maintenanceILS")}
+            min={800} max={25000} />
 
           <EstimateRow icon={TrendingDown} iconColor="#f97316" label={t("depreciationYr")}
             estimatedDisplay={`${car.estimates.depreciationRatePercent}%`} unit="%/yr"
             manualValue={car.overrides.depreciationRatePercent != null ? String(car.overrides.depreciationRatePercent) : null}
-            onSave={(v) => setOverride("depreciationRatePercent", v)} onReset={() => clearOverride("depreciationRatePercent")} />
+            onSave={(v) => setOverride("depreciationRatePercent", v)} onReset={() => clearOverride("depreciationRatePercent")}
+            min={3} max={25} />
 
           <EstimateRow icon={Fuel} iconColor="#eab308" label={t("fuelEfficiency")}
             estimatedDisplay={`${car.estimates.realWorldKmL} km/L`} unit="km/L"
             manualValue={car.overrides.realWorldKmL != null ? String(car.overrides.realWorldKmL) : null}
-            onSave={(v) => setOverride("realWorldKmL", v)} onReset={() => clearOverride("realWorldKmL")} />
+            onSave={(v) => setOverride("realWorldKmL", v)} onReset={() => clearOverride("realWorldKmL")}
+            min={0} max={50} />
 
           <EstimateRow icon={Fuel} iconColor="#f59e0b" label={t("fuelPriceLbl")}
             estimatedDisplay={`₪${car.estimates.fuelPricePerLiter.toFixed(2)}/L`} unit="₪/L"
             manualValue={car.overrides.fuelPricePerLiter != null ? String(car.overrides.fuelPricePerLiter) : null}
-            onSave={(v) => setOverride("fuelPricePerLiter", v)} onReset={() => clearOverride("fuelPricePerLiter")} />
+            onSave={(v) => setOverride("fuelPricePerLiter", v)} onReset={() => clearOverride("fuelPricePerLiter")}
+            min={5} max={10} />
 
           <EstimateRow icon={ShieldCheck} iconColor="#a78bfa" label={t("insuranceLbl")}
             estimatedDisplay={formatILS(car.estimates.insuranceILS)} unit="₪/yr"
             manualValue={car.overrides.insuranceILS != null ? String(car.overrides.insuranceILS) : null}
-            onSave={(v) => setOverride("insuranceILS", v)} onReset={() => clearOverride("insuranceILS")} />
+            onSave={(v) => setOverride("insuranceILS", v)} onReset={() => clearOverride("insuranceILS")}
+            min={1500} max={10000} />
 
           <button onClick={handleApply} className="btn-success w-full py-3 mt-1">
             <Check size={14} /> {car.tco ? t("recalculate") : t("applyCalculate")}
@@ -531,7 +577,7 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
           <div className="rounded-xl p-4 flex items-center justify-between"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
             <div>
-              <p className="text-slate-500 text-xs">{t("totalHoldingCost")} ({car.holdingPeriodYears})</p>
+              <p className="text-slate-500 text-xs">{t("totalHoldingCost")} — {car.holdingPeriodYears} {t("holdingPeriodYearsLabel")}</p>
               <p className="text-white text-xs mt-0.5 text-slate-600">{t("incDepreciation")}</p>
             </div>
             <p className="text-white text-xl font-extrabold tabular-nums">{formatILS(car.tco.totalHoldingCostILS)}</p>

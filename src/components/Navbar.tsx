@@ -46,6 +46,12 @@ export default function Navbar() {
 
         {/* Nav */}
         <nav className="flex items-center gap-3">
+          {/* Guide link */}
+          <Link href="/guide"
+            className="text-slate-400 hover:text-white text-sm transition-colors hidden sm:block">
+            {t("guideLink")}
+          </Link>
+
           {/* Language toggle */}
           <button
             onClick={() => setLang(lang === "he" ? "en" : "he")}
