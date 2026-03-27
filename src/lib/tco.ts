@@ -658,7 +658,7 @@ function estimateAnnualMaintenance(
 
   // 1.5x multiplier: base routine covers oil/filters; real-world also includes
   // tire replacement, annual roadworthiness test (טסט), unplanned repairs, wipers, brakes, etc.
-  return Math.round(baseRoutineCost * ageFactor * reliabilityFactor * 1.5);
+  return Math.round(Math.max(800, baseRoutineCost * ageFactor * reliabilityFactor * 1.95));
 }
 
 // ─── Reliability scores (1–10) ───────────────────────────────────────────────
@@ -760,9 +760,8 @@ export function estimateInsurance(purchasePrice: number, year: number): number {
   // Comprehensive (מקיף) rate as % of purchase price, decreasing with age
   const rate = age <= 2 ? 0.028 : age <= 5 ? 0.024 : age <= 10 ? 0.020 : 0.016;
   const comprehensive = purchasePrice * rate;
-  // 1.5x for חובה inclusion, ×1.35 calibration to match real IL market prices
-  const raw = comprehensive * 1.5 * 1.35;
-  return Math.round(Math.max(3_000, Math.min(18_000, raw)));
+  const raw = comprehensive * 2.3;
+  return Math.round(Math.max(3_500, Math.min(22_000, raw)));
 }
 
 // ─── Main TCO calculator ──────────────────────────────────────────────────────
