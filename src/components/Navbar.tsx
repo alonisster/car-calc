@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, BarChart3 } from "lucide-react";
+import { LogOut, BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { useLang } from "@/contexts/LanguageContext";
 
 export default function Navbar() {
   const router = useRouter();
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const { lang, setLang, t } = useLang();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -44,6 +46,29 @@ export default function Navbar() {
 
         {/* Nav */}
         <nav className="flex items-center gap-3">
+          {/* Language toggle */}
+          <button
+            onClick={() => setLang(lang === "he" ? "en" : "he")}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: "#94a3b8",
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.2)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#fff";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.1)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8";
+            }}
+            title={lang === "he" ? "Switch to English" : "עבור לעברית"}
+          >
+            <span className="text-[10px] opacity-60">{lang === "he" ? "🇮🇱" : "🇬🇧"}</span>
+            {t("langToggle")}
+          </button>
+
           {user ? (
             <>
               <div className="hidden sm:flex items-center gap-2 text-slate-400 text-sm bg-white/5 border border-white/[0.07] rounded-full px-3 py-1.5">
@@ -55,7 +80,7 @@ export default function Navbar() {
               <button
                 onClick={handleLogout}
                 className="text-slate-500 hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-red-500/10"
-                title="Sign out"
+                title={t("signOut")}
               >
                 <LogOut size={15} />
               </button>
@@ -64,11 +89,11 @@ export default function Navbar() {
             <>
               <Link href="/auth/login"
                 className="text-slate-400 hover:text-white text-sm transition-colors hidden sm:block">
-                Sign in
+                {t("signIn")}
               </Link>
               <Link href="/auth/signup"
                 className="btn-primary !py-1.5 !px-3.5 !text-xs !rounded-lg">
-                Sign up free
+                {t("signUpFree")}
               </Link>
             </>
           )}

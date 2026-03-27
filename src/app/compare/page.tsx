@@ -12,6 +12,7 @@ import SearchSelect, { type SelectOption } from "@/components/SearchSelect";
 import { calculateTCO, estimateInsurance, formatILS, type CarInput, type TCOResult, type TCOOverrides } from "@/lib/tco";
 import { MAKES, MODELS_BY_MAKE, resolveDisplayMake } from "@/lib/carCatalog";
 import { supabase } from "@/lib/supabase";
+import { useLang } from "@/contexts/LanguageContext";
 
 // ── Option lists ──────────────────────────────────────────────────────────────
 const MAKE_OPTIONS: SelectOption[] = MAKES.map((m) => ({
@@ -87,12 +88,13 @@ function ScoreBar({ score, label }: { score: number; label: string }) {
 
 // ── CostBar — proportional waterfall breakdown ────────────────────────────────
 function CostBreakdown({ tco }: { tco: TCOResult }) {
+  const { t } = useLang();
   const total = tco.annualDepreciationILS + tco.annualFuelCostILS + tco.annualMaintenanceCostILS + tco.annualInsuranceCostILS;
   const items = [
-    { label: "Depreciation", value: tco.annualDepreciationILS,    color: "#f97316", icon: TrendingDown },
-    { label: "Fuel",         value: tco.annualFuelCostILS,        color: "#eab308", icon: Fuel },
-    { label: "Maintenance",  value: tco.annualMaintenanceCostILS, color: "#3b82f6", icon: Wrench },
-    { label: "Insurance",    value: tco.annualInsuranceCostILS,   color: "#a78bfa", icon: ShieldCheck },
+    { label: t("depreciationRow"), value: tco.annualDepreciationILS,    color: "#f97316", icon: TrendingDown },
+    { label: t("fuelRow"),         value: tco.annualFuelCostILS,        color: "#eab308", icon: Fuel },
+    { label: t("maintenanceRow"),  value: tco.annualMaintenanceCostILS, color: "#3b82f6", icon: Wrench },
+    { label: t("insuranceRow"),    value: tco.annualInsuranceCostILS,   color: "#a78bfa", icon: ShieldCheck },
   ];
   return (
     <div className="space-y-2">
@@ -129,6 +131,7 @@ function EstimateRow({
   manualValue: string | null;
   onSave: (v: string) => void; onReset: () => void;
 }) {
+  const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
   const isOverridden = manualValue !== null;
@@ -172,7 +175,7 @@ function EstimateRow({
                 {isOverridden ? `${manualValue} ${unit}` : estimatedDisplay}
               </p>
               {isOverridden && (
-                <span className="text-slate-600 text-xs">est. {estimatedDisplay}</span>
+                <span className="text-slate-600 text-xs">{t("est")} {estimatedDisplay}</span>
               )}
             </div>
           )}
@@ -197,7 +200,7 @@ function EstimateRow({
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#fff"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.09)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8"; (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)"; }}>
               <Pencil size={11} />
-              {isOverridden ? "Edit" : "Enter manually"}
+              {isOverridden ? t("editBtn") : t("enterManually")}
             </button>
           </div>
         )}
@@ -225,6 +228,7 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
   onRemove: (id: string) => void; canRemove: boolean;
   fuelPrices: { petrol: number; diesel: number };
 }) {
+  const { t } = useLang();
   const [showInputs, setShowInputs] = useState(true);
   const [plateInput, setPlateInput] = useState(car.plate);
   const accent = CARD_ACCENTS[index % CARD_ACCENTS.length];
@@ -235,14 +239,14 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
     try {
       const res = await fetch(`/api/car?plate=${encodeURIComponent(plateInput.trim())}`);
       const data = await res.json();
-      if (!res.ok) { onUpdate(car.id, { loadingPlate: false, plateError: data.error ?? "Not found" }); return; }
+      if (!res.ok) { onUpdate(car.id, { loadingPlate: false, plateError: data.error ?? t("notFound") }); return; }
       onUpdate(car.id, {
         loadingPlate: false, plate: plateInput, make: resolveDisplayMake(data.make),
         model: data.model, year: data.year, trim: data.trim,
         engineSize: data.engineSize, fuelType: data.fuelType,
         plateError: "", estimates: null, tco: null,
       });
-    } catch { onUpdate(car.id, { loadingPlate: false, plateError: "Network error" }); }
+    } catch { onUpdate(car.id, { loadingPlate: false, plateError: t("networkError") }); }
   };
 
   const handleEstimate = () => {
@@ -284,8 +288,8 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
   };
 
   const ready = isReady(car);
-  const missingFields = [!car.make && "Make", !car.model && "Model", (!car.year || car.year <= 1990) && "Year", !car.purchasePrice && "Price", !car.annualMileageKm && "Mileage"].filter(Boolean) as string[];
-  const carTitle = car.make && car.model ? `${car.year} ${car.make} ${car.model}` : `Car ${index + 1}`;
+  const missingFields = [!car.make && t("fieldMake"), !car.model && t("fieldModel"), (!car.year || car.year <= 1990) && t("fieldYear"), !car.purchasePrice && t("fieldPrice"), !car.annualMileageKm && t("fieldMileage")].filter(Boolean) as string[];
+  const carTitle = car.make && car.model ? `${car.year} ${car.make} ${car.model}` : `${t("carLabel")} ${index + 1}`;
 
   return (
     <div className="rounded-2xl overflow-hidden flex flex-col"
@@ -308,7 +312,7 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
         <div className="flex items-center gap-1 shrink-0">
           {car.tco && (
             <span className="text-xs font-bold mr-2 tabular-nums" style={{ color: accent.from }}>
-              {formatILS(car.tco.monthlyTCO)}<span className="text-slate-600 font-normal">/mo</span>
+              {formatILS(car.tco.monthlyTCO)}<span className="text-slate-600 font-normal">/{t("mo")}</span>
             </span>
           )}
           <button onClick={() => setShowInputs(v => !v)}
@@ -330,7 +334,7 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
           {/* Plate */}
           <div>
             <label className="text-slate-500 text-xs font-semibold uppercase tracking-wider block mb-1.5">
-              License Plate <span className="text-slate-700 normal-case font-normal">(auto-fill)</span>
+              {t("licensePlate")} <span className="text-slate-700 normal-case font-normal">{t("autoFill")}</span>
             </label>
             <div className="flex gap-2">
               <div className="flex-1 flex items-stretch rounded-lg overflow-hidden"
@@ -342,7 +346,7 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
                 </div>
                 <input type="text" value={plateInput} onChange={(e) => setPlateInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && lookupPlate()}
-                  placeholder="123-45-678"
+                  placeholder="123-45-678" dir="ltr"
                   className="flex-1 text-sm font-mono tracking-wider bg-transparent text-white placeholder-slate-600 px-3 focus:outline-none"
                   style={{ background: "rgba(248,246,238,0.05)" }} />
               </div>
@@ -363,25 +367,25 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
 
           {/* Make / Model */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Make" required>
+            <Field label={t("makeLbl")} required>
               <SearchSelect value={car.make} onChange={(v) => onUpdate(car.id, { make: v, model: "", estimates: null, tco: null })}
                 options={MAKE_OPTIONS} placeholder="Toyota, טויוטה…" />
             </Field>
-            <Field label="Model" required>
+            <Field label={t("modelLbl")} required>
               <SearchSelect value={car.model} onChange={(v) => onUpdate(car.id, { model: v, estimates: null, tco: null })}
-                options={modelOptions(car.make)} placeholder={car.make ? "Select model" : "—"} disabled={!car.make} />
+                options={modelOptions(car.make)} placeholder={car.make ? t("modelLbl") : "—"} disabled={!car.make} />
             </Field>
           </div>
 
           {/* Year / Engine */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Year" required>
-              <input type="number" min="1990" max={new Date().getFullYear() + 1}
+            <Field label={t("yearLbl")} required>
+              <input type="number" min="1990" max={new Date().getFullYear() + 1} dir="ltr"
                 value={car.year || ""} placeholder="2022" className="input-dark"
                 onChange={(e) => onUpdate(car.id, { year: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
             </Field>
-            <Field label="Engine (L)">
-              <input type="number" step="0.1" min="0" value={car.engineSize ?? ""} placeholder="1.6" className="input-dark"
+            <Field label={t("engineLbl")}>
+              <input type="number" step="0.1" min="0" dir="ltr" value={car.engineSize ?? ""} placeholder="1.6" className="input-dark"
                 onChange={(e) => onUpdate(car.id, { engineSize: e.target.value ? parseFloat(e.target.value) : null, estimates: null, tco: null })} />
             </Field>
           </div>
@@ -390,27 +394,27 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
 
           {/* Financial */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Purchase Price (₪)" required>
-              <input type="number" step="1000" min="0" value={car.purchasePrice || ""} placeholder="120,000" className="input-dark"
+            <Field label={t("purchasePriceLbl")} required>
+              <input type="number" step="1000" min="0" dir="ltr" value={car.purchasePrice || ""} placeholder="120,000" className="input-dark"
                 onChange={(e) => onUpdate(car.id, { purchasePrice: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
             </Field>
-            <Field label="Annual Mileage (km)" required>
-              <input type="number" step="1000" min="0" value={car.annualMileageKm || ""} placeholder="15,000" className="input-dark"
+            <Field label={t("annualMileageLbl")} required>
+              <input type="number" step="1000" min="0" dir="ltr" value={car.annualMileageKm || ""} placeholder="15,000" className="input-dark"
                 onChange={(e) => onUpdate(car.id, { annualMileageKm: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
             </Field>
           </div>
-          <Field label="Holding Period (years)">
-            <input type="number" min="1" max="15" value={car.holdingPeriodYears} className="input-dark"
+          <Field label={t("holdingPeriodLbl")}>
+            <input type="number" min="1" max="15" dir="ltr" value={car.holdingPeriodYears} className="input-dark"
               onChange={(e) => onUpdate(car.id, { holdingPeriodYears: parseInt(e.target.value) || 1, estimates: null, tco: null })} />
           </Field>
 
           <button onClick={handleEstimate} disabled={!ready}
-            title={!ready ? `Fill: ${missingFields.join(", ")}` : undefined}
+            title={!ready ? `${t("requiredFields")} ${missingFields.join(", ")}` : undefined}
             className="btn-primary w-full py-3">
-            <RefreshCw size={14} /> Calculate TCO
+            <RefreshCw size={14} /> {t("calculateTCO")}
           </button>
           {!ready && missingFields.length > 0 && (
-            <p className="text-slate-600 text-xs -mt-1 text-center">Required: {missingFields.join(", ")}</p>
+            <p className="text-slate-600 text-xs -mt-1 text-center">{t("requiredFields")} {missingFields.join(", ")}</p>
           )}
         </div>
       )}
@@ -420,8 +424,8 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
         <div className="px-5 pb-5 space-y-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           <div className="flex items-center justify-between pt-4 pb-1">
             <div>
-              <h4 className="text-white text-sm font-semibold">Key Assumptions</h4>
-              <p className="text-slate-600 text-xs mt-0.5">Override any value before finalising</p>
+              <h4 className="text-white text-sm font-semibold">{t("keyAssumptions")}</h4>
+              <p className="text-slate-600 text-xs mt-0.5">{t("overrideHint")}</p>
             </div>
             <div className="flex items-center gap-1">
               {[1, 2, 3].map((i) => (
@@ -431,33 +435,33 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
             </div>
           </div>
 
-          <EstimateRow icon={Wrench} iconColor="#3b82f6" label="Maintenance / yr"
+          <EstimateRow icon={Wrench} iconColor="#3b82f6" label={t("maintenanceYr")}
             estimatedDisplay={formatILS(car.estimates.maintenanceILS)} unit="₪/yr"
             manualValue={car.overrides.maintenanceILS != null ? String(car.overrides.maintenanceILS) : null}
             onSave={(v) => setOverride("maintenanceILS", v)} onReset={() => clearOverride("maintenanceILS")} />
 
-          <EstimateRow icon={TrendingDown} iconColor="#f97316" label="Depreciation / yr"
+          <EstimateRow icon={TrendingDown} iconColor="#f97316" label={t("depreciationYr")}
             estimatedDisplay={`${car.estimates.depreciationRatePercent}%`} unit="%/yr"
             manualValue={car.overrides.depreciationRatePercent != null ? String(car.overrides.depreciationRatePercent) : null}
             onSave={(v) => setOverride("depreciationRatePercent", v)} onReset={() => clearOverride("depreciationRatePercent")} />
 
-          <EstimateRow icon={Fuel} iconColor="#eab308" label="Real-world fuel efficiency"
+          <EstimateRow icon={Fuel} iconColor="#eab308" label={t("fuelEfficiency")}
             estimatedDisplay={`${car.estimates.realWorldKmL} km/L`} unit="km/L"
             manualValue={car.overrides.realWorldKmL != null ? String(car.overrides.realWorldKmL) : null}
             onSave={(v) => setOverride("realWorldKmL", v)} onReset={() => clearOverride("realWorldKmL")} />
 
-          <EstimateRow icon={Fuel} iconColor="#f59e0b" label="Fuel price (₪/L)"
+          <EstimateRow icon={Fuel} iconColor="#f59e0b" label={t("fuelPriceLbl")}
             estimatedDisplay={`₪${car.estimates.fuelPricePerLiter.toFixed(2)}/L`} unit="₪/L"
             manualValue={car.overrides.fuelPricePerLiter != null ? String(car.overrides.fuelPricePerLiter) : null}
             onSave={(v) => setOverride("fuelPricePerLiter", v)} onReset={() => clearOverride("fuelPricePerLiter")} />
 
-          <EstimateRow icon={ShieldCheck} iconColor="#a78bfa" label="Insurance (מקיף + חובה) / yr"
+          <EstimateRow icon={ShieldCheck} iconColor="#a78bfa" label={t("insuranceLbl")}
             estimatedDisplay={formatILS(car.estimates.insuranceILS)} unit="₪/yr"
             manualValue={car.overrides.insuranceILS != null ? String(car.overrides.insuranceILS) : null}
             onSave={(v) => setOverride("insuranceILS", v)} onReset={() => clearOverride("insuranceILS")} />
 
           <button onClick={handleApply} className="btn-success w-full py-3 mt-1">
-            <Check size={14} /> {car.tco ? "Recalculate TCO" : "Apply & Calculate TCO"}
+            <Check size={14} /> {car.tco ? t("recalculate") : t("applyCalculate")}
           </button>
         </div>
       )}
@@ -466,12 +470,12 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
       {car.tco && (
         <div className="px-5 pb-5 space-y-4" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           <div className="flex items-center justify-between pt-4">
-            <h4 className="text-white text-sm font-semibold">Results</h4>
+            <h4 className="text-white text-sm font-semibold">{t("results")}</h4>
             <span className="text-xs rounded-full px-2.5 py-0.5 font-medium"
               style={car.tco.dataSource === "model-specific"
                 ? { background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", color: "#6ee7b7" }
                 : { background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", color: "#fcd34d" }}>
-              {car.tco.dataSource === "model-specific" ? "Model data" : "Engine estimate"}
+              {car.tco.dataSource === "model-specific" ? t("modelData") : t("engineEstimate")}
             </span>
           </div>
 
@@ -479,13 +483,13 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
           <div className="rounded-xl p-4" style={{ background: `linear-gradient(135deg, ${accent.from}18, ${accent.to}0a)`, border: `1px solid ${accent.from}30` }}>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-slate-500 text-xs mb-1">Monthly TCO</p>
+                <p className="text-slate-500 text-xs mb-1">{t("monthlyTCO")}</p>
                 <p className="text-2xl font-extrabold tabular-nums" style={{ color: accent.from }}>
                   {formatILS(car.tco.monthlyTCO)}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs mb-1">Annual TCO</p>
+                <p className="text-slate-500 text-xs mb-1">{t("annualTCO")}</p>
                 <p className="text-2xl font-extrabold text-white tabular-nums">
                   {formatILS(car.tco.annualTCO)}
                 </p>
@@ -499,14 +503,14 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
           {/* Secondary stats */}
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: "Residual value", value: formatILS(car.tco.residualValueILS), color: "#10b981" },
-              { label: "Depr. rate", value: `${car.tco.depreciationRatePercent}%/yr`, color: "#f97316" },
+              { label: t("residualValue"), value: formatILS(car.tco.residualValueILS), color: "#10b981" },
+              { label: t("depreciationRate"), value: `${car.tco.depreciationRatePercent}%/yr`, color: "#f97316" },
               ...(car.tco.officialKmPerLiter > 0
                 ? [
-                  { label: "Official fuel", value: `${car.tco.officialKmPerLiter} km/L`, color: "#94a3b8" },
-                  { label: "Real-world", value: `${car.tco.realWorldKmPerLiter} km/L`, color: "#eab308" },
+                  { label: t("officialFuel"), value: `${car.tco.officialKmPerLiter} km/L`, color: "#94a3b8" },
+                  { label: t("realWorldFuel"), value: `${car.tco.realWorldKmPerLiter} km/L`, color: "#eab308" },
                 ]
-                : [{ label: "Fuel type", value: "Electric", color: "#10b981" }]
+                : [{ label: t("fuelTypeLbl"), value: t("electric"), color: "#10b981" }]
               ),
             ].map(({ label, value, color }) => (
               <div key={label} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -518,16 +522,16 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
 
           {/* Scores */}
           <div className="space-y-2.5">
-            <ScoreBar score={car.tco.reliabilityScore} label="Reliability (IL market)" />
-            <ScoreBar score={car.tco.resaleScore} label="Resale Value (IL market)" />
+            <ScoreBar score={car.tco.reliabilityScore} label={t("reliabilityScore")} />
+            <ScoreBar score={car.tco.resaleScore} label={t("resaleScore")} />
           </div>
 
           {/* Total holding cost */}
           <div className="rounded-xl p-4 flex items-center justify-between"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
             <div>
-              <p className="text-slate-500 text-xs">Total {car.holdingPeriodYears}-year cost</p>
-              <p className="text-white text-xs mt-0.5 text-slate-600">inc. depreciation, fuel, maintenance</p>
+              <p className="text-slate-500 text-xs">{t("totalHoldingCost")} ({car.holdingPeriodYears})</p>
+              <p className="text-white text-xs mt-0.5 text-slate-600">{t("incDepreciation")}</p>
             </div>
             <p className="text-white text-xl font-extrabold tabular-nums">{formatILS(car.tco.totalHoldingCostILS)}</p>
           </div>
@@ -550,6 +554,7 @@ function fromDraft(d: DraftCar): CarEntry {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 function ComparePageInner() {
+  const { t } = useLang();
   const searchParams = useSearchParams();
   const initialCar = newCar({
     plate: searchParams.get("plate") ?? "",
@@ -641,17 +646,17 @@ function ComparePageInner() {
             <div className="flex items-center gap-3 min-w-0">
               <FolderOpen size={16} className="text-blue-400 shrink-0" />
               <div>
-                <p className="text-white text-sm font-semibold">You have a saved comparison</p>
+                <p className="text-white text-sm font-semibold">{t("youHaveSaved")}</p>
                 <p className="text-slate-500 text-xs mt-0.5">
-                  Saved {new Date(draft.savedAt).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  {" · "}{draft.cars.length} car{draft.cars.length > 1 ? "s" : ""}
+                  {t("savedOn")} {new Date(draft.savedAt).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {" · "}{draft.cars.length} {t("cars")}
                   {draft.cars.filter(c => c.make).map(c => ` · ${c.make} ${c.model}`).join("")}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button onClick={loadDraft} className="btn-primary !py-2 !px-4 !text-xs !rounded-lg">
-                <FolderOpen size={13} /> Load Draft
+                <FolderOpen size={13} /> {t("loadDraft")}
               </button>
               <button onClick={() => setShowDraftBanner(false)}
                 className="p-1.5 rounded-lg text-slate-600 hover:text-white transition-colors">
@@ -664,11 +669,11 @@ function ComparePageInner() {
         {/* Page header */}
         <div className="flex items-end justify-between mb-8">
           <div>
-            <p className="text-slate-600 text-xs uppercase tracking-widest font-semibold mb-1">Total Cost of Ownership</p>
-            <h1 className="text-white text-2xl font-extrabold tracking-tight">Compare Vehicles</h1>
+            <p className="text-slate-600 text-xs uppercase tracking-widest font-semibold mb-1">{t("totalCostOfOwnership")}</p>
+            <h1 className="text-white text-2xl font-extrabold tracking-tight">{t("compareVehicles")}</h1>
             <p className="text-slate-600 text-xs mt-1.5">
-              Fuel default: <span className="text-amber-400 font-medium">₪{fuelPrices.petrol.toFixed(2)}/L</span>
-              <span className="ml-1">(editable per car below)</span>
+              {t("fuelDefaultLabel")} <span className="text-amber-400 font-medium">₪{fuelPrices.petrol.toFixed(2)}/L</span>
+              <span className="ml-1">{t("editablePerCar")}</span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -681,7 +686,7 @@ function ComparePageInner() {
                   color: saveStatus === "saved" ? "#6ee7b7" : saveStatus === "error" ? "#fca5a5" : "#93c5fd",
                 }}>
                 {saveStatus === "saving" ? <Loader2 size={14} className="animate-spin" /> : saveStatus === "saved" ? <Check size={14} /> : <Save size={14} />}
-                {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Error" : "Save"}
+                {saveStatus === "saving" ? t("saving") : saveStatus === "saved" ? t("saved") : saveStatus === "error" ? t("errorStatus") : t("save")}
               </button>
             )}
             {cars.length < 3 && (
@@ -690,7 +695,7 @@ function ComparePageInner() {
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.15)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8"; }}>
-                <Plus size={15} /> Add Car
+                <Plus size={15} /> {t("addCar")}
               </button>
             )}
           </div>
@@ -708,17 +713,17 @@ function ComparePageInner() {
           <div className="mt-10 rounded-2xl overflow-hidden"
             style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
             <div className="px-6 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-              <h2 className="text-white font-bold">Side-by-Side Summary</h2>
-              <p className="text-slate-600 text-xs mt-0.5">Green highlights the best value in each row</p>
+              <h2 className="text-white font-bold">{t("sideBySide")}</h2>
+              <p className="text-slate-600 text-xs mt-0.5">{t("bestValueHint")}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                    <th className="text-left px-6 py-3 text-slate-600 text-xs uppercase tracking-wider font-semibold">Metric</th>
+                    <th className="text-left px-6 py-3 text-slate-600 text-xs uppercase tracking-wider font-semibold">{t("metric")}</th>
                     {cars.map((c, i) => (
                       <th key={c.id} className="text-right px-6 py-3 text-xs font-semibold" style={{ color: CARD_ACCENTS[i % CARD_ACCENTS.length].from }}>
-                        {c.make ? `${c.make} ${c.model}` : `Car ${i + 1}`}
+                        {c.make ? `${c.make} ${c.model}` : `${t("carLabel")} ${i + 1}`}
                       </th>
                     ))}
                   </tr>
@@ -726,7 +731,7 @@ function ComparePageInner() {
                 <tbody>
                   {/* Purchase price row — from CarEntry, not TCOResult */}
                   <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                    <td className="px-6 py-3 text-slate-500 text-xs">Purchase price</td>
+                    <td className="px-6 py-3 text-slate-500 text-xs">{t("purchasePriceRow")}</td>
                     {cars.map((c, i) => {
                       const prices = cars.map(x => x.purchasePrice);
                       const best = Math.min(...prices);
@@ -740,17 +745,17 @@ function ComparePageInner() {
                   </tr>
                   {(
                     [
-                      { label: "Monthly TCO",         key: "monthlyTCO",               fmt: formatILS,                                bestIsMin: true  },
-                      { label: "Annual TCO",           key: "annualTCO",                fmt: formatILS,                                bestIsMin: true  },
-                      { label: "Depreciation / yr",   key: "depreciationRatePercent",  fmt: (v: number) => `${v}%`,                   bestIsMin: true  },
-                      { label: "Fuel / yr",            key: "annualFuelCostILS",        fmt: formatILS,                                bestIsMin: true  },
-                      { label: "Maintenance / yr",     key: "annualMaintenanceCostILS", fmt: formatILS,                                bestIsMin: true  },
-                      { label: "Insurance / yr",       key: "annualInsuranceCostILS",   fmt: formatILS,                                bestIsMin: true  },
-                      { label: "Official fuel",        key: "officialKmPerLiter",       fmt: (v: number) => v > 0 ? `${v} km/L` : "EV", bestIsMin: false },
-                      { label: "Real-world fuel eff.", key: "realWorldKmPerLiter",      fmt: (v: number) => v > 0 ? `${v} km/L` : "EV", bestIsMin: false },
-                      { label: "Residual value",       key: "residualValueILS",         fmt: formatILS,                                bestIsMin: false },
-                      { label: "Reliability",          key: "reliabilityScore",         fmt: (v: number) => `${v}/10`,                 bestIsMin: false },
-                      { label: "Resale Score",         key: "resaleScore",              fmt: (v: number) => `${v}/10`,                 bestIsMin: false },
+                      { label: t("monthlyTCORow"),   key: "monthlyTCO",               fmt: formatILS,                                bestIsMin: true  },
+                      { label: t("annualTCORow"),    key: "annualTCO",                fmt: formatILS,                                bestIsMin: true  },
+                      { label: t("depreciationRow"), key: "depreciationRatePercent",  fmt: (v: number) => `${v}%`,                   bestIsMin: true  },
+                      { label: t("fuelRow"),         key: "annualFuelCostILS",        fmt: formatILS,                                bestIsMin: true  },
+                      { label: t("maintenanceRow"),  key: "annualMaintenanceCostILS", fmt: formatILS,                                bestIsMin: true  },
+                      { label: t("insuranceRow"),    key: "annualInsuranceCostILS",   fmt: formatILS,                                bestIsMin: true  },
+                      { label: t("officialFuelRow"), key: "officialKmPerLiter",       fmt: (v: number) => v > 0 ? `${v} km/L` : "EV", bestIsMin: false },
+                      { label: t("realWorldRow"),    key: "realWorldKmPerLiter",      fmt: (v: number) => v > 0 ? `${v} km/L` : "EV", bestIsMin: false },
+                      { label: t("residualRow"),     key: "residualValueILS",         fmt: formatILS,                                bestIsMin: false },
+                      { label: t("reliabilityRow"),  key: "reliabilityScore",         fmt: (v: number) => `${v}/10`,                 bestIsMin: false },
+                      { label: t("resaleRow"),       key: "resaleScore",              fmt: (v: number) => `${v}/10`,                 bestIsMin: false },
                     ] as { label: string; key: keyof TCOResult; fmt: (v: number) => string; bestIsMin: boolean }[]
                   ).map(({ label, key, fmt, bestIsMin }) => {
                     const values = cars.map((c) => c.tco![key] as number);
@@ -773,7 +778,7 @@ function ComparePageInner() {
           </div>
         )}
         <p className="mt-8 text-slate-700 text-xs text-center">
-          Estimates based on Israeli market data. Default fuel ₪7.50/L — override per car if needed. Actual costs vary.
+          {t("disclaimer")}
         </p>
       </main>
     </div>

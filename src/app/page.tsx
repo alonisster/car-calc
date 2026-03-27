@@ -8,38 +8,8 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { resolveDisplayMake } from "@/lib/carCatalog";
+import { useLang } from "@/contexts/LanguageContext";
 import Link from "next/link";
-
-const FEATURES = [
-  {
-    icon: Fuel,
-    color: "from-amber-500/20 to-amber-600/5",
-    iconColor: "text-amber-400",
-    title: "Real-World Fuel Cost",
-    desc: "WLTP figures corrected +30% for Israeli traffic, summer heat, and AC usage.",
-  },
-  {
-    icon: TrendingDown,
-    color: "from-orange-500/20 to-orange-600/5",
-    iconColor: "text-orange-400",
-    title: "Israeli Depreciation",
-    desc: "Annual value drop based on yad2.co.il market trends — 10–16% per year by brand.",
-  },
-  {
-    icon: Wrench,
-    color: "from-blue-500/20 to-blue-600/5",
-    iconColor: "text-blue-400",
-    title: "Smart Maintenance",
-    desc: "Age × reliability score formula. A 12-yr Fiat costs 2.4× more than a 12-yr Toyota.",
-  },
-  {
-    icon: BarChart3,
-    color: "from-violet-500/20 to-violet-600/5",
-    iconColor: "text-violet-400",
-    title: "Side-by-Side TCO",
-    desc: "Compare up to 3 vehicles with overridable assumptions and full cost breakdown.",
-  },
-];
 
 interface PlateResult {
   make: string; model: string; year: number;
@@ -50,6 +20,7 @@ type Tab = "plate" | "manual";
 
 export default function HomePage() {
   const router = useRouter();
+  const { t } = useLang();
   const [tab, setTab] = useState<Tab>("plate");
   const [plate, setPlate] = useState("");
   const [loading, setLoading] = useState(false);
@@ -63,9 +34,9 @@ export default function HomePage() {
     try {
       const res = await fetch(`/api/car?plate=${encodeURIComponent(plate.trim())}`);
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Vehicle not found."); return; }
+      if (!res.ok) { setError(data.error ?? t("notFound")); return; }
       setResult(data);
-    } catch { setError("Network error. Please try again."); }
+    } catch { setError(t("networkError")); }
     finally { setLoading(false); }
   };
 
@@ -80,6 +51,19 @@ export default function HomePage() {
   };
 
   const englishMake = result ? resolveDisplayMake(result.make) : "";
+
+  const FEATURES = [
+    { icon: Fuel, color: "from-amber-500/20 to-amber-600/5", iconColor: "text-amber-400", title: t("fuelTitle"), desc: t("fuelDesc") },
+    { icon: TrendingDown, color: "from-orange-500/20 to-orange-600/5", iconColor: "text-orange-400", title: t("depreciationTitle"), desc: t("depreciationDesc") },
+    { icon: Wrench, color: "from-blue-500/20 to-blue-600/5", iconColor: "text-blue-400", title: t("maintenanceTitle"), desc: t("maintenanceDesc") },
+    { icon: BarChart3, color: "from-violet-500/20 to-violet-600/5", iconColor: "text-violet-400", title: t("tcoTitle"), desc: t("tcoDesc") },
+  ];
+
+  const STEPS = [
+    { step: "1", title: t("step1Title"), desc: t("step1Desc") },
+    { step: "2", title: t("step2Title"), desc: t("step2Desc") },
+    { step: "3", title: t("step3Title"), desc: t("step3Desc") },
+  ];
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#070b14" }}>
@@ -106,25 +90,25 @@ export default function HomePage() {
               <span className="ping-slow absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
             </span>
-            Israeli Vehicle Registry — Live Data
+            {t("liveBadge")}
           </div>
 
           <h1 className="text-5xl md:text-[4rem] lg:text-[4.5rem] font-extrabold tracking-tight leading-[1.08] text-white mb-4">
-            Know the{" "}
+            {t("heroTitle")}{" "}
             <span style={{ background: "linear-gradient(135deg,#60a5fa,#34d399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              real cost
+              {t("heroGradient")}
             </span>
-            <br />of any car
+            <br />{t("heroTitle2")}
           </h1>
           <p className="text-slate-400 text-lg max-w-xl mx-auto mb-5 leading-relaxed">
-            The sticker price is just the beginning. Compare up to 3 cars side-by-side and see the <strong className="text-slate-300">true annual cost</strong> — fuel, maintenance, depreciation, and insurance — tailored to the Israeli market.
+            {t("heroSub")}
           </p>
 
           {/* Value proposition callout */}
           <div className="inline-flex items-center gap-3 rounded-2xl px-5 py-3 mb-10 text-sm"
             style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.18)" }}>
-            <span className="text-emerald-400 font-semibold">Example:</span>
-            <span className="text-slate-400">A ₪90,000 Mazda 3 can cost <span className="text-white font-semibold">₪12,000/yr less</span> to own than a ₪75,000 Dacia Duster.</span>
+            <span className="text-emerald-400 font-semibold shrink-0">{t("exampleLabel")}</span>
+            <span className="text-slate-400">{t("exampleText")}</span>
           </div>
 
           {/* ── Input card ──────────────────────────────────────────────── */}
@@ -141,7 +125,7 @@ export default function HomePage() {
                 }}
               >
                 <Search size={14} />
-                Search by Plate
+                {t("tabPlate")}
               </button>
               <button
                 onClick={() => { setTab("manual"); setResult(null); setError(""); }}
@@ -153,20 +137,18 @@ export default function HomePage() {
                 }}
               >
                 <SlidersHorizontal size={14} />
-                Choose Manually
+                {t("tabManual")}
               </button>
             </div>
 
             <div className="p-6">
               {tab === "plate" ? (
                 <div>
-                  <p className="text-slate-500 text-sm mb-4">
-                    Enter your Israeli plate number — we'll auto-fill make, model, and year.
-                  </p>
+                  <p className="text-slate-500 text-sm mb-4">{t("plateInputHint")}</p>
                   <form onSubmit={lookup} className="space-y-3">
-                    {/* Plate-styled input */}
+                    {/* Plate input — always LTR */}
                     <div className="relative rounded-xl overflow-hidden shadow-xl"
-                      style={{ border: "2px solid rgba(255,255,255,0.12)" }}>
+                      style={{ border: "2px solid rgba(255,255,255,0.12)" }} dir="ltr">
                       <div className="flex items-stretch">
                         <div className="flex flex-col items-center justify-center gap-0.5 px-3.5 shrink-0 self-stretch"
                           style={{ background: "linear-gradient(180deg,#1e3a8a,#1e40af)", borderRight: "2px solid rgba(255,255,255,0.15)" }}>
@@ -192,8 +174,8 @@ export default function HomePage() {
                       className="btn-primary w-full py-3 text-sm"
                     >
                       {loading
-                        ? <><Loader2 size={16} className="animate-spin" /> Looking up…</>
-                        : <><Zap size={15} /> Look Up Vehicle</>
+                        ? <><Loader2 size={16} className="animate-spin" /> {t("lookingUp")}</>
+                        : <><Zap size={15} /> {t("lookupBtn")}</>
                       }
                     </button>
                   </form>
@@ -206,14 +188,13 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* Result → big CTA */}
                   {result && (
                     <div className="mt-4 animate-in">
                       <div className="rounded-xl p-4 mb-3"
                         style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)" }}>
                         <div className="flex items-center gap-2 mb-1">
                           <ShieldCheck size={14} className="text-emerald-400" />
-                          <span className="text-emerald-400 text-xs font-semibold uppercase tracking-wider">Vehicle Found</span>
+                          <span className="text-emerald-400 text-xs font-semibold uppercase tracking-wider">{t("vehicleFound")}</span>
                         </div>
                         <p className="text-white text-lg font-bold">
                           {result.year} {englishMake} {result.model}
@@ -240,11 +221,8 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={goToCompare}
-                        className="btn-success w-full py-3.5 text-base font-bold"
-                      >
-                        Start TCO Comparison <ArrowRight size={18} />
+                      <button onClick={goToCompare} className="btn-success w-full py-3.5 text-base font-bold">
+                        {t("startTCO")} <ArrowRight size={18} />
                       </button>
                     </div>
                   )}
@@ -255,17 +233,12 @@ export default function HomePage() {
                     style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)" }}>
                     <BarChart3 className="text-blue-400" size={26} />
                   </div>
-                  <h3 className="text-white font-bold text-lg mb-2">Pick your cars, compare costs</h3>
-                  <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-                    Choose make, model, year and purchase price for up to 3 cars.
-                    We'll calculate full TCO with fuel, maintenance, and depreciation.
-                  </p>
+                  <h3 className="text-white font-bold text-lg mb-2">{t("manualTitle")}</h3>
+                  <p className="text-slate-500 text-sm mb-6 leading-relaxed">{t("manualDesc")}</p>
                   <Link href="/compare" className="btn-primary w-full py-3.5 text-base font-bold inline-flex items-center justify-center gap-2">
-                    Open Comparison Tool <ArrowRight size={18} />
+                    {t("openCompareTool")} <ArrowRight size={18} />
                   </Link>
-                  <p className="text-slate-600 text-xs mt-4">
-                    You can also search by plate on the comparison page to add a second or third car.
-                  </p>
+                  <p className="text-slate-600 text-xs mt-4">{t("manualHint")}</p>
                 </div>
               )}
             </div>
@@ -274,13 +247,9 @@ export default function HomePage() {
 
         {/* ── How it works ────────────────────────────────────────────── */}
         <div className="mt-16 max-w-2xl w-full animate-in delay-150">
-          <p className="text-center text-xs font-semibold uppercase tracking-widest mb-6" style={{ color: "#475569" }}>How it works</p>
+          <p className="text-center text-xs font-semibold uppercase tracking-widest mb-6" style={{ color: "#475569" }}>{t("howItWorks")}</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              { step: "1", title: "Add your cars", desc: "Search by Israeli plate number or pick make, model & year manually. Add up to 3 cars." },
-              { step: "2", title: "Set your assumptions", desc: "Adjust purchase price, annual km, fuel price, and depreciation to match your situation." },
-              { step: "3", title: "Compare real costs", desc: "See annual & monthly TCO side-by-side. Identify which car is actually cheaper to own." },
-            ].map(({ step, title, desc }) => (
+            {STEPS.map(({ step, title, desc }) => (
               <div key={step} className="rounded-2xl p-5 text-center"
                 style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
                 <div className="w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-3 text-sm font-bold"
@@ -297,7 +266,7 @@ export default function HomePage() {
         {/* ── Feature grid ──────────────────────────────────────────────── */}
         <div className="mt-10 max-w-3xl w-full grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in delay-200">
           <div className="sm:col-span-2 text-center mb-1">
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#475569" }}>What's factored in</p>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#475569" }}>{t("whatsFactoredIn")}</p>
           </div>
           {FEATURES.map(({ icon: Icon, color, iconColor, title, desc }) => (
             <div key={title} className="group rounded-2xl p-5 flex gap-4 transition-all duration-200 cursor-default"

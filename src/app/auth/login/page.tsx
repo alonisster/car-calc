@@ -5,9 +5,11 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BarChart3, Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
+import { useLang } from "@/contexts/LanguageContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useLang();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -51,11 +53,11 @@ export default function LoginPage() {
 
         <div className="card-glow">
           <div className="p-7">
-            <h1 className="text-white text-2xl font-bold mb-1">Welcome back</h1>
+            <h1 className="text-white text-2xl font-bold mb-1">{t("welcomeBack")}</h1>
             <p className="text-slate-500 text-sm mb-6">
-              No account?{" "}
+              {t("noAccount")}{" "}
               <Link href="/auth/signup" className="text-blue-400 hover:text-blue-300 transition-colors font-medium">
-                Sign up free
+                {t("signUpFreeLink")}
               </Link>
             </p>
 
@@ -68,26 +70,26 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-slate-400 text-xs font-semibold uppercase tracking-wider block mb-2">Email</label>
+                <label className="text-slate-400 text-xs font-semibold uppercase tracking-wider block mb-2">{t("emailLbl")}</label>
                 <input name="email" type="email" required value={form.email} onChange={handleChange}
-                  placeholder="avi@example.com" className="input-dark" />
+                  placeholder="avi@example.com" className="input-dark" dir="ltr" />
               </div>
 
               <div>
-                <label className="text-slate-400 text-xs font-semibold uppercase tracking-wider block mb-2">Password</label>
+                <label className="text-slate-400 text-xs font-semibold uppercase tracking-wider block mb-2">{t("passwordLbl")}</label>
                 <div className="relative">
                   <input name="password" type={showPassword ? "text" : "password"} required
                     value={form.password} onChange={handleChange}
-                    placeholder="••••••••" className="input-dark pr-10" />
+                    placeholder="••••••••" className="input-dark pr-10" dir="ltr" />
                   <button type="button" onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
                     {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
               </div>
 
               <button type="submit" disabled={loading} className="btn-primary w-full py-3 mt-1">
-                {loading ? <><Loader2 size={15} className="animate-spin" /> Signing in…</> : <>Sign in <ArrowRight size={15} /></>}
+                {loading ? <><Loader2 size={15} className="animate-spin" /> {t("signingIn")}</> : <>{t("signInBtn")} <ArrowRight size={15} /></>}
               </button>
             </form>
           </div>
