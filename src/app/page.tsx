@@ -173,7 +173,7 @@ export default function HomePage() {
                       {[
                         { label: lang === "he" ? "דלק" : "Fuel",            value: car.annualFuel,  color: "#eab308" },
                         { label: lang === "he" ? "תחזוקה" : "Maintenance",  value: car.annualMaint, color: "#3b82f6" },
-                        { label: lang === "he" ? "פחת" : "Depreciation",    value: car.annualDepr,  color: "#f97316" },
+                        { label: lang === "he" ? "ירידת ערך" : "Depreciation",    value: car.annualDepr,  color: "#f97316" },
                         { label: lang === "he" ? "ביטוח" : "Insurance",     value: car.annualIns,   color: "#a78bfa" },
                       ].map(({ label, value, color }) => (
                         <div key={label} className="flex items-center justify-between text-xs">
