@@ -94,7 +94,7 @@ export default function Navbar() {
           ) : (
             <>
               <Link href="/auth/login"
-                className="text-slate-400 hover:text-white text-sm transition-colors hidden sm:block">
+                className="text-slate-400 hover:text-white text-sm transition-colors">
                 {t("signIn")}
               </Link>
               <Link href="/auth/signup"
