@@ -1,3 +1,5 @@
+export type DriveType = "ice" | "hybrid" | "electric";
+
 export interface CarInput {
   make: string;
   model: string;
@@ -7,6 +9,8 @@ export interface CarInput {
   purchasePrice: number; // ILS
   annualMileageKm: number;
   holdingPeriodYears: number;
+  driveType?: DriveType;       // user-selected powertrain type
+  currentOdometerKm?: number;  // km already driven (affects maintenance estimate)
 }
 
 export interface TCOResult {
@@ -525,10 +529,13 @@ function getRealWorldCorrection(fuelType: string, officialL100: number): number 
 }
 
 // ─── Fallback: engine-size estimate (when model not in DB) ───────────────────
-function engineSizeEstimate(engineSize: number | null, fuelType: string): number {
+function engineSizeEstimate(engineSize: number | null, fuelType: string, driveType?: DriveType): number {
   const ft = fuelType.toLowerCase();
-  if (ft.includes("חשמל") || ft.includes("electric")) return 0;
-  if (ft.includes("היברידי") || ft.includes("hybrid")) {
+  const isElectric = driveType === "electric" || ft.includes("חשמל") || ft.includes("electric");
+  const isHybrid   = driveType === "hybrid"   || ft.includes("היברידי") || ft.includes("hybrid");
+
+  if (isElectric) return 0;
+  if (isHybrid) {
     return engineSize ? Math.max(4.0, engineSize * 2.8) : 5.0;
   }
   if (!engineSize) return 8.0;
@@ -641,11 +648,25 @@ function reliabilityMaintenanceMultiplier(reliabilityScore: number): number {
   return 1.65;
 }
 
+/**
+ * Odometer multiplier — higher accumulated mileage = more wear on engine,
+ * transmission, and chassis components, raising expected annual repair costs.
+ */
+function odometerMaintenanceMultiplier(odometerKm: number): number {
+  if (odometerKm <= 0)       return 1.00; // not provided / new
+  if (odometerKm < 50_000)   return 0.90; // low mileage, minimal wear
+  if (odometerKm < 100_000)  return 1.00; // baseline
+  if (odometerKm < 150_000)  return 1.20; // increased wear on engine & drivetrain
+  if (odometerKm < 200_000)  return 1.45; // likely needs major components soon
+  return 1.75;                            // 200k+ km — significant ongoing repairs
+}
+
 function estimateAnnualMaintenance(
   annualMileageKm: number,
   make: string,
   carYear: number,
   reliabilityScore: number,
+  currentOdometerKm?: number,
 ): number {
   const tier = getMaintenanceTier(make);
   const { small, large } = MAINTENANCE_COSTS[tier];
@@ -655,10 +676,11 @@ function estimateAnnualMaintenance(
 
   const ageFactor = ageMaintenanceMultiplier(carYear);
   const reliabilityFactor = reliabilityMaintenanceMultiplier(reliabilityScore);
+  const odometerFactor = odometerMaintenanceMultiplier(currentOdometerKm ?? 0);
 
-  // 1.5x multiplier: base routine covers oil/filters; real-world also includes
+  // 1.95x multiplier: base routine covers oil/filters; real-world also includes
   // tire replacement, annual roadworthiness test (טסט), unplanned repairs, wipers, brakes, etc.
-  return Math.round(Math.max(800, baseRoutineCost * ageFactor * reliabilityFactor * 1.95));
+  return Math.round(Math.max(800, baseRoutineCost * ageFactor * reliabilityFactor * odometerFactor * 1.95));
 }
 
 // ─── Reliability scores (1–10) ───────────────────────────────────────────────
@@ -766,16 +788,18 @@ export function estimateInsurance(purchasePrice: number, year: number): number {
 
 // ─── Main TCO calculator ──────────────────────────────────────────────────────
 export function calculateTCO(input: CarInput, overrides?: TCOOverrides): TCOResult {
-  const { make, model, year, engineSize, fuelType, purchasePrice, annualMileageKm, holdingPeriodYears } = input;
+  const { make, model, year, engineSize, fuelType, purchasePrice, annualMileageKm, holdingPeriodYears, driveType, currentOdometerKm } = input;
 
-  const isEV = fuelType.toLowerCase().includes("חשמל") || fuelType.toLowerCase().includes("electric");
+  const isEV = driveType === "electric" || fuelType.toLowerCase().includes("חשמל") || fuelType.toLowerCase().includes("electric");
 
   // ── Fuel consumption ──────────────────────────────────────────────────────
   const modelLookup = lookupModelFuel(make, model);
   const dataSource: TCOResult["dataSource"] = modelLookup !== null ? "model-specific" : "engine-estimate";
-  const officialFuelConsumption = modelLookup ?? engineSizeEstimate(engineSize, fuelType);
+  const officialFuelConsumption = modelLookup ?? engineSizeEstimate(engineSize, fuelType, driveType);
 
-  const rwCorrection = getRealWorldCorrection(fuelType, officialFuelConsumption);
+  // Hybrid driveType overrides fuelType string for correction factor
+  const effectiveFuelTypeForCorrection = driveType === "hybrid" ? "hybrid" : driveType === "electric" ? "electric" : fuelType;
+  const rwCorrection = getRealWorldCorrection(effectiveFuelTypeForCorrection, officialFuelConsumption);
   const computedRealWorldL100 = officialFuelConsumption * rwCorrection;
 
   // Apply manual real-world km/L override → convert back to L/100km for cost calc
@@ -799,7 +823,7 @@ export function calculateTCO(input: CarInput, overrides?: TCOOverrides): TCOResu
 
   // ── Maintenance ───────────────────────────────────────────────────────────
   const annualMaintenanceCostILS = overrides?.maintenanceILS
-    ?? estimateAnnualMaintenance(annualMileageKm, make, year, reliabilityScore);
+    ?? estimateAnnualMaintenance(annualMileageKm, make, year, reliabilityScore, currentOdometerKm);
   const monthlyMaintenanceCostILS = annualMaintenanceCostILS / 12;
 
   // ── Depreciation ──────────────────────────────────────────────────────────

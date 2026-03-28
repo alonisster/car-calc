@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, Suspense, useEffect, useCallback } from "react";
+import { useState, Suspense, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import {
   Plus, X, Fuel, Wrench, TrendingDown, RefreshCw,
@@ -9,7 +10,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import SearchSelect, { type SelectOption } from "@/components/SearchSelect";
-import { calculateTCO, estimateInsurance, formatILS, type CarInput, type TCOResult, type TCOOverrides } from "@/lib/tco";
+import { calculateTCO, estimateInsurance, formatILS, type CarInput, type TCOResult, type TCOOverrides, type DriveType } from "@/lib/tco";
 import { MAKES, MODELS_BY_MAKE, resolveDisplayMake } from "@/lib/carCatalog";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/contexts/LanguageContext";
@@ -34,6 +35,7 @@ interface CarEntry {
   id: string;
   plate: string; make: string; model: string; year: number;
   trim: string; engineSize: number | null; fuelType: string;
+  driveType: DriveType; currentOdometerKm: number;
   purchasePrice: number; annualMileageKm: number; holdingPeriodYears: number;
   estimates: Estimates | null;
   overrides: Partial<TCOOverrides>;
@@ -44,6 +46,7 @@ interface CarEntry {
 const DEFAULT_CAR: Omit<CarEntry, "id"> = {
   plate: "", make: "", model: "", year: new Date().getFullYear(),
   trim: "", engineSize: null, fuelType: "בנזין",
+  driveType: "ice", currentOdometerKm: 0,
   purchasePrice: 0, annualMileageKm: 0, holdingPeriodYears: 5,
   estimates: null, overrides: {}, tco: null,
   loadingPlate: false, plateError: "",
@@ -55,7 +58,7 @@ function isReady(c: CarEntry) {
   return c.make.trim() !== "" && c.model.trim() !== "" && c.year > 1990 && c.purchasePrice > 0 && c.annualMileageKm > 0;
 }
 function toInput(c: CarEntry): CarInput {
-  return { make: c.make, model: c.model, year: c.year, engineSize: c.engineSize, fuelType: c.fuelType, purchasePrice: c.purchasePrice, annualMileageKm: c.annualMileageKm, holdingPeriodYears: c.holdingPeriodYears };
+  return { make: c.make, model: c.model, year: c.year, engineSize: c.engineSize, fuelType: c.fuelType, purchasePrice: c.purchasePrice, annualMileageKm: c.annualMileageKm, holdingPeriodYears: c.holdingPeriodYears, driveType: c.driveType, currentOdometerKm: c.currentOdometerKm || 0 };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -233,13 +236,92 @@ function EstimateRow({
   );
 }
 
+// ── Info tooltip (portal-based to escape parent overflow) ─────────────────────
+function InfoTooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const handleEnter = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setCoords({ top: r.top + window.scrollY, left: r.left + r.width / 2 });
+    }
+    setShow(true);
+  };
+
+  const tooltip = show && mounted ? createPortal(
+    <div
+      dir="rtl"
+      className="pointer-events-none"
+      style={{
+        position: "absolute",
+        top: coords.top - 12,
+        left: coords.left,
+        transform: "translate(-50%, -100%)",
+        zIndex: 9999,
+        width: 240,
+        background: "#0d1526",
+        border: "1px solid rgba(59,130,246,0.35)",
+        borderRadius: 12,
+        padding: "10px 14px",
+        color: "#cbd5e1",
+        fontSize: 12,
+        lineHeight: 1.6,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      }}>
+      {text}
+      {/* Arrow */}
+      <span style={{
+        position: "absolute",
+        bottom: -6,
+        left: "50%",
+        transform: "translateX(-50%) rotate(45deg)",
+        width: 10,
+        height: 10,
+        background: "#0d1526",
+        borderBottom: "1px solid rgba(59,130,246,0.35)",
+        borderRight: "1px solid rgba(59,130,246,0.35)",
+      }} />
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <span className="relative inline-flex items-center shrink-0"
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setShow(false)}>
+      <button
+        ref={btnRef}
+        type="button"
+        className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold leading-none transition-colors shrink-0"
+        style={{
+          background: show ? "rgba(59,130,246,0.25)" : "rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          color: show ? "#93c5fd" : "#64748b",
+        }}
+        tabIndex={-1}
+        aria-label="info">
+        i
+      </button>
+      {tooltip}
+    </span>
+  );
+}
+
 // ── Shared input field ────────────────────────────────────────────────────────
-function Field({ label, required: req, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required: req, tooltip, children }: { label: string; required?: boolean; tooltip?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="text-slate-500 text-xs font-semibold uppercase tracking-wider block mb-1.5">
-        {label}{req && <span className="text-blue-500 ml-0.5">*</span>}
-      </label>
+      <div className="flex items-center gap-1 mb-1.5 h-4">
+        <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider leading-none">
+          {label}{req && <span className="text-blue-500 ml-0.5">*</span>}
+        </span>
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </div>
       {children}
     </div>
   );
@@ -362,9 +444,12 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
         <div className="p-5 space-y-4">
           {/* Plate */}
           <div>
-            <label className="text-slate-500 text-xs font-semibold uppercase tracking-wider block mb-1.5">
-              {t("licensePlate")} <span className="text-slate-700 normal-case font-normal">{t("autoFill")}</span>
-            </label>
+            <div className="flex items-center gap-1 mb-1.5 h-4">
+              <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider leading-none">
+                {t("licensePlate")} <span className="text-slate-700 normal-case font-normal">{t("autoFill")}</span>
+              </span>
+              <InfoTooltip text={t("tooltipLicensePlate")} />
+            </div>
             <div className="flex gap-2">
               <div className="flex-1 flex items-stretch rounded-lg overflow-hidden"
                 style={{ border: "1px solid rgba(255,255,255,0.09)" }}>
@@ -406,16 +491,20 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
             </Field>
           </div>
 
-          {/* Year / Engine */}
+          {/* Year / Drive Type */}
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("yearLbl")} required>
               <input type="number" min="1990" max={new Date().getFullYear() + 1} dir="ltr"
                 value={car.year || ""} placeholder="2022" className="input-dark"
                 onChange={(e) => onUpdate(car.id, { year: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
             </Field>
-            <Field label={t("engineLbl")}>
-              <input type="number" step="0.1" min="0" dir="ltr" value={car.engineSize ?? ""} placeholder="1.6" className="input-dark"
-                onChange={(e) => onUpdate(car.id, { engineSize: e.target.value ? parseFloat(e.target.value) : null, estimates: null, tco: null })} />
+            <Field label={t("driveTypeLbl")}>
+              <select value={car.driveType} className="input-dark w-full"
+                onChange={(e) => onUpdate(car.id, { driveType: e.target.value as DriveType, estimates: null, tco: null })}>
+                <option value="ice">{t("driveTypeIce")}</option>
+                <option value="hybrid">{t("driveTypeHybrid")}</option>
+                <option value="electric">{t("driveTypeElectric")}</option>
+              </select>
             </Field>
           </div>
 
@@ -424,7 +513,7 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
           {/* Financial */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Field label={t("purchasePriceLbl")} required>
+              <Field label={t("purchasePriceLbl")} required tooltip={t("tooltipPurchasePrice")}>
                 <input type="number" step="1000" min="0" dir="ltr" value={car.purchasePrice || ""} placeholder="לדוגמא: 120,000"
                   className={`input-dark ${priceError ? "border-red-500/50" : ""}`}
                   onChange={(e) => onUpdate(car.id, { purchasePrice: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
@@ -432,7 +521,7 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
               {priceError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{priceError}</p>}
             </div>
             <div>
-              <Field label={t("annualMileageLbl")} required>
+              <Field label={t("annualMileageLbl")} required tooltip={t("tooltipAnnualMileage")}>
                 <input type="number" step="1000" min="0" dir="ltr" value={car.annualMileageKm || ""} placeholder="לדוגמא: 15,000"
                   className={`input-dark ${mileageError ? "border-red-500/50" : ""}`}
                   onChange={(e) => onUpdate(car.id, { annualMileageKm: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
@@ -448,6 +537,18 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
                 onBlur={(e) => { if (!parseInt(e.target.value)) onUpdate(car.id, { holdingPeriodYears: 1 }); }} />
             </Field>
             {periodError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{periodError}</p>}
+          </div>
+
+          {/* Optional: Engine size / Current odometer */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={t("engineLbl")}>
+              <input type="number" step="0.1" min="0" dir="ltr" value={car.engineSize ?? ""} placeholder="1.6" className="input-dark"
+                onChange={(e) => onUpdate(car.id, { engineSize: e.target.value ? parseFloat(e.target.value) : null, estimates: null, tco: null })} />
+            </Field>
+            <Field label={t("odometerLbl")} tooltip={t("tooltipOdometer")}>
+              <input type="number" step="1000" min="0" dir="ltr" value={car.currentOdometerKm || ""} placeholder="80,000" className="input-dark"
+                onChange={(e) => onUpdate(car.id, { currentOdometerKm: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
+            </Field>
           </div>
 
           <button onClick={handleEstimate} disabled={!ready || hasRangeErrors}
