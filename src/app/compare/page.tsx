@@ -58,7 +58,9 @@ function isReady(c: CarEntry) {
   return c.make.trim() !== "" && c.model.trim() !== "" && c.year > 1990 && c.purchasePrice > 0 && c.annualMileageKm > 0;
 }
 function toInput(c: CarEntry): CarInput {
-  return { make: c.make, model: c.model, year: c.year, engineSize: c.engineSize, fuelType: c.fuelType, purchasePrice: c.purchasePrice, annualMileageKm: c.annualMileageKm, holdingPeriodYears: c.holdingPeriodYears, driveType: c.driveType, currentOdometerKm: c.currentOdometerKm || 0 };
+  // engineSize is stored in cc in the UI; convert to liters for TCO engine
+  const engineSizeL = c.engineSize ? c.engineSize / 1000 : null;
+  return { make: c.make, model: c.model, year: c.year, engineSize: engineSizeL, fuelType: c.fuelType, purchasePrice: c.purchasePrice, annualMileageKm: c.annualMileageKm, holdingPeriodYears: c.holdingPeriodYears, driveType: c.driveType, currentOdometerKm: c.currentOdometerKm || 0 };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -394,12 +396,13 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
   };
 
   const ready = isReady(car);
-  const missingFields = [!car.make && t("fieldMake"), !car.model && t("fieldModel"), (!car.year || car.year <= 1990) && t("fieldYear"), !car.purchasePrice && t("fieldPrice"), !car.annualMileageKm && t("fieldMileage")].filter(Boolean) as string[];
+  const missingFields = [!car.make && t("fieldMake"), !car.model && t("fieldModel"), (!car.year || car.year <= 1990) && t("fieldYear"), !car.purchasePrice && t("fieldPrice"), !car.annualMileageKm && t("fieldMileage"), (!car.holdingPeriodYears || car.holdingPeriodYears < 1) && (lang === "he" ? "תקופה" : "Period")].filter(Boolean) as string[];
 
   const priceError   = car.purchasePrice > 0   && (car.purchasePrice < 5_000   || car.purchasePrice > 1_000_000) ? rangeMsg(5_000, 1_000_000, lang) : null;
   const mileageError = car.annualMileageKm > 0 && (car.annualMileageKm < 2_000 || car.annualMileageKm > 80_000)  ? rangeMsg(2_000, 80_000, lang)    : null;
   const periodError  = car.holdingPeriodYears > 0 && (car.holdingPeriodYears < 1 || car.holdingPeriodYears > 20) ? rangeMsg(1, 20, lang)             : null;
-  const hasRangeErrors = !!(priceError || mileageError || periodError);
+  const engineError  = car.engineSize != null && car.engineSize > 0 && (car.engineSize < 800 || car.engineSize > 10_000) ? rangeMsg(800, 10_000, lang) : null;
+  const hasRangeErrors = !!(priceError || mileageError || periodError || engineError);
   const carTitle = car.make && car.model ? `${car.year} ${car.make} ${car.model}` : `${t("carLabel")} ${index + 1}`;
 
   return (
@@ -510,41 +513,75 @@ function CarCard({ car, index, onUpdate, onRemove, canRemove, fuelPrices }: {
 
           <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
 
-          {/* Financial */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Field label={t("purchasePriceLbl")} required tooltip={t("tooltipPurchasePrice")}>
-                <input type="number" step="1000" min="0" dir="ltr" value={car.purchasePrice || ""} placeholder="לדוגמא: 120,000"
-                  className={`input-dark ${priceError ? "border-red-500/50" : ""}`}
-                  onChange={(e) => onUpdate(car.id, { purchasePrice: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
-              </Field>
-              {priceError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{priceError}</p>}
-            </div>
-            <div>
-              <Field label={t("annualMileageLbl")} required tooltip={t("tooltipAnnualMileage")}>
-                <input type="number" step="1000" min="0" dir="ltr" value={car.annualMileageKm || ""} placeholder="לדוגמא: 15,000"
-                  className={`input-dark ${mileageError ? "border-red-500/50" : ""}`}
-                  onChange={(e) => onUpdate(car.id, { annualMileageKm: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
-              </Field>
-              {mileageError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{mileageError}</p>}
-            </div>
-          </div>
+          {/* Purchase price — full width */}
           <div>
-            <Field label={t("holdingPeriodLbl")}>
+            <Field label={t("purchasePriceLbl")} required tooltip={t("tooltipPurchasePrice")}>
+              <input type="number" step="1000" min="0" dir="ltr" value={car.purchasePrice || ""} placeholder="לדוגמא: 120,000"
+                className={`input-dark ${priceError ? "border-red-500/50" : ""}`}
+                onChange={(e) => onUpdate(car.id, { purchasePrice: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
+            </Field>
+            {priceError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{priceError}</p>}
+          </div>
+
+          {/* Annual mileage — full width with quick chips */}
+          <div>
+            <Field label={t("annualMileageLbl")} required tooltip={t("tooltipAnnualMileage")}>
+              <input type="number" step="1000" min="0" dir="ltr" value={car.annualMileageKm || ""} placeholder="לדוגמא: 15,000"
+                className={`input-dark ${mileageError ? "border-red-500/50" : ""}`}
+                onChange={(e) => onUpdate(car.id, { annualMileageKm: parseInt(e.target.value) || 0, estimates: null, tco: null })} />
+            </Field>
+            <div className="flex gap-1.5 mt-2 flex-wrap">
+              {[10000, 15000, 20000, 25000].map((km) => (
+                <button key={km} type="button"
+                  onClick={() => onUpdate(car.id, { annualMileageKm: km, estimates: null, tco: null })}
+                  className="text-xs px-2.5 py-1 rounded-lg transition-all"
+                  style={{
+                    background: car.annualMileageKm === km ? "rgba(59,130,246,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${car.annualMileageKm === km ? "rgba(59,130,246,0.45)" : "rgba(255,255,255,0.08)"}`,
+                    color: car.annualMileageKm === km ? "#93c5fd" : "#64748b",
+                  }}>
+                  {(km / 1000).toFixed(0)}k
+                </button>
+              ))}
+            </div>
+            {mileageError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{mileageError}</p>}
+          </div>
+
+          {/* Holding period — full width, required, with quick chips */}
+          <div>
+            <Field label={t("holdingPeriodLbl")} required>
               <input type="number" min="1" max="20" dir="ltr" value={car.holdingPeriodYears || ""}
                 className={`input-dark ${periodError ? "border-red-500/50" : ""}`}
                 onChange={(e) => onUpdate(car.id, { holdingPeriodYears: parseInt(e.target.value) || 0, estimates: null, tco: null })}
                 onBlur={(e) => { if (!parseInt(e.target.value)) onUpdate(car.id, { holdingPeriodYears: 1 }); }} />
             </Field>
+            <div className="flex gap-1.5 mt-2 flex-wrap">
+              {[3, 5, 7, 10].map((yr) => (
+                <button key={yr} type="button"
+                  onClick={() => onUpdate(car.id, { holdingPeriodYears: yr, estimates: null, tco: null })}
+                  className="text-xs px-2.5 py-1 rounded-lg transition-all"
+                  style={{
+                    background: car.holdingPeriodYears === yr ? "rgba(59,130,246,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${car.holdingPeriodYears === yr ? "rgba(59,130,246,0.45)" : "rgba(255,255,255,0.08)"}`,
+                    color: car.holdingPeriodYears === yr ? "#93c5fd" : "#64748b",
+                  }}>
+                  {yr} {lang === "he" ? "שנים" : "yr"}
+                </button>
+              ))}
+            </div>
             {periodError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{periodError}</p>}
           </div>
 
           {/* Optional: Engine size / Current odometer */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t("engineLbl")}>
-              <input type="number" step="0.1" min="0" dir="ltr" value={car.engineSize ?? ""} placeholder="1.6" className="input-dark"
-                onChange={(e) => onUpdate(car.id, { engineSize: e.target.value ? parseFloat(e.target.value) : null, estimates: null, tco: null })} />
-            </Field>
+            <div>
+              <Field label={t("engineLbl")}>
+                <input type="number" step="100" min="0" dir="ltr" value={car.engineSize ?? ""} placeholder="1600"
+                  className={`input-dark ${engineError ? "border-red-500/50" : ""}`}
+                  onChange={(e) => onUpdate(car.id, { engineSize: e.target.value ? parseInt(e.target.value) : null, estimates: null, tco: null })} />
+              </Field>
+              {engineError && <p className="text-red-400 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{engineError}</p>}
+            </div>
             <Field label={t("odometerLbl")} tooltip={t("tooltipOdometer")}>
               <input type="number" step="1000" min="0" dir="ltr" value={car.currentOdometerKm || ""} placeholder="80,000" className="input-dark"
                 onChange={(e) => onUpdate(car.id, { currentOdometerKm: parseInt(e.target.value) || 0, estimates: null, tco: null })} />

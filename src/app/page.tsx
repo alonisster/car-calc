@@ -95,9 +95,17 @@ export default function HomePage() {
               {t("guideHeroGradient")}
             </span>
           </h1>
-          <p className="text-slate-400 text-lg leading-relaxed max-w-xl mx-auto">
+          <p className="text-slate-400 text-lg leading-relaxed max-w-xl mx-auto mb-8">
             {t("guideHeroSub")}
           </p>
+          <Link href="/compare"
+            className="inline-flex items-center gap-2.5 px-8 py-4 rounded-2xl text-base font-bold transition-all duration-200"
+            style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "#fff", boxShadow: "0 4px 24px rgba(37,99,235,0.35)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 6px 32px rgba(37,99,235,0.55)")}
+            onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 4px 24px rgba(37,99,235,0.35)")}>
+            {lang === "he" ? "התחל השוואה" : "Start Comparing"}
+            <ArrowRight size={18} />
+          </Link>
         </section>
 
         {/* ── Hidden costs ──────────────────────────────────────────────────── */}
@@ -165,7 +173,7 @@ export default function HomePage() {
                       {[
                         { label: lang === "he" ? "דלק" : "Fuel",            value: car.annualFuel,  color: "#eab308" },
                         { label: lang === "he" ? "תחזוקה" : "Maintenance",  value: car.annualMaint, color: "#3b82f6" },
-                        { label: lang === "he" ? "פחת" : "Depreciation",    value: car.annualDepr,  color: "#f97316" },
+                        { label: lang === "he" ? "ירידת ערך" : "Depreciation",    value: car.annualDepr,  color: "#f97316" },
                         { label: lang === "he" ? "ביטוח" : "Insurance",     value: car.annualIns,   color: "#a78bfa" },
                       ].map(({ label, value, color }) => (
                         <div key={label} className="flex items-center justify-between text-xs">
